@@ -1,0 +1,120 @@
+// ============================================================
+// input.js — 공통 조작 체계 + 0.5초 홀딩 판정
+// 키 입력을 '행동 이벤트'로 바꿔 GL.Input.events 에 쌓는다.
+// ============================================================
+GL.Input = {
+  keys: {},            // 눌려 있는 키 (e.code)
+  events: [],          // 이번 프레임에 발생한 행동
+  mouse: { x: 0, y: 0, dx: 0, dy: 0, left: false, right: false },
+  locked: false,       // 포인터 잠금(마우스로 카메라 회전)
+  _left: null,         // { t, heavyFired, air }
+  _num: {},            // 숫자키 홀딩 상태 { Digit1: { t, fired } }
+  isAirborne: () => false, // main 에서 연결
+
+  init(canvas) {
+    const prevent = ['Tab', 'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'Escape'];
+    window.addEventListener('keydown', (e) => {
+      if (prevent.includes(e.code) || e.code.startsWith('Digit')) e.preventDefault();
+      if (e.repeat) return;
+      this.keys[e.code] = true;
+      this.onKeyDown(e.code);
+    });
+    window.addEventListener('keyup', (e) => {
+      this.keys[e.code] = false;
+      this.onKeyUp(e.code);
+    });
+    window.addEventListener('blur', () => { this.keys = {}; this._left = null; this._num = {}; this.mouse.right = false; });
+
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('mousemove', (e) => {
+      this.mouse.x = e.clientX; this.mouse.y = e.clientY;
+      // 마우스 이동 = 카메라 회전 (잠금 중일 때, 또는 잠금이 막힌 환경에선 마우스 이동량 그대로)
+      if (GL.Main.state === 'play') { this.mouse.dx += e.movementX || 0; this.mouse.dy += e.movementY || 0; }
+    });
+    document.addEventListener('pointerlockchange', () => {
+      this.locked = document.pointerLockElement === canvas;
+      if (!this.locked && GL.Main.state === 'play') GL.Main.state = 'pause';   // Esc로 잠금이 풀리면 일시정지
+    });
+    this.canvas = canvas;
+    canvas.addEventListener('mousedown', (e) => {
+      this.mouse.x = e.clientX; this.mouse.y = e.clientY;
+      if (!this.locked) this.lock();
+      if (e.button === 0) {
+        this.mouse.left = true;
+        this.push('click');
+        if (this.isAirborne()) {
+          // 공중 : 좌클릭 = 점프 공격, Ctrl + 좌클릭 = 점프 강공격
+          const ctrl = this.keys.ControlLeft || this.keys.ControlRight || e.ctrlKey;
+          this.push(ctrl ? 'jumpHeavy' : 'jumpAtk');
+          this._left = { t: 0, heavyFired: true, air: true };
+        } else {
+          this._left = { t: 0, heavyFired: false, air: false };
+        }
+      } else if (e.button === 2) {
+        this.mouse.right = true; // 우클릭 = 대쉬(누르고 있는 동안)
+      }
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) {
+        this.mouse.left = false;
+        if (this._left && !this._left.heavyFired) this.push('light');
+        this._left = null;
+      } else if (e.button === 2) {
+        this.mouse.right = false;
+      }
+    });
+  },
+
+  onKeyDown(code) {
+    const map = {
+      Space: 'jump', ShiftLeft: 'dodge', ShiftRight: 'dodge',
+      KeyQ: 'q', KeyE: 'e', KeyR: 'r', Tab: 'observe',
+      KeyF: 'interact', KeyM: 'map', Escape: 'pause', Enter: 'confirm',
+    };
+    if (map[code]) this.push(map[code]);
+    if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3') {
+      this._num[code] = { t: 0, fired: false };
+    }
+  },
+
+  onKeyUp(code) {
+    const n = this._num[code];
+    if (n) {
+      // 0.5초 전에 떼면 태그
+      if (!n.fired) this.push('tag', parseInt(code.slice(5), 10) - 1);
+      delete this._num[code];
+    }
+  },
+
+  update(dt) {
+    const hold = GL.CONFIG.rules.holdTime;
+    // 좌클릭 0.5초 홀딩 = 강공격
+    if (this._left && !this._left.heavyFired) {
+      this._left.t += dt;
+      if (this._left.t >= hold) { this._left.heavyFired = true; this.push('heavy'); }
+    }
+    // 숫자키 0.5초 홀딩 = 조력 스킬
+    for (const code in this._num) {
+      const n = this._num[code];
+      n.t += dt;
+      if (!n.fired && n.t >= hold) { n.fired = true; this.push('assist', parseInt(code.slice(5), 10) - 1); }
+    }
+  },
+
+  // 강공격 차징 진행도(0~1) — UI 표시용
+  chargeRatio() {
+    if (!this._left || this._left.air) return 0;
+    return Math.min(1, this._left.t / GL.CONFIG.rules.holdTime);
+  },
+
+  lock() {
+    try {
+      const r = this.canvas.requestPointerLock && this.canvas.requestPointerLock();
+      if (r && r.catch) r.catch(() => {});
+    } catch (e) { /* 잠금이 막힌 환경: 마우스 이동량으로만 회전 */ }
+  },
+  unlock() { try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) {} },
+
+  push(type, value) { this.events.push({ type, value }); },
+  consume() { const ev = this.events; this.events = []; return ev; },
+};
