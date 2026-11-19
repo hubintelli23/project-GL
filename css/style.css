@@ -1,4 +1,4 @@
-/* Project GL 프로토타입 v0.2 */
+/* Project GL 프로토타입 v0.4 */
 html, body {
   margin: 0;
   padding: 0;
@@ -8,6 +8,13 @@ html, body {
   background: #05070d;
   font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;          /* 휴대폰 : 확대·스크롤 막기 */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  position: fixed;             /* iOS 사파리 : 화면 튕김 방지 */
+  inset: 0;
 }
 #gl3d, #game {
   position: fixed;

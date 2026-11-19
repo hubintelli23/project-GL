@@ -8,14 +8,29 @@ GL.Main = {
   init() {
     const cv = document.getElementById('game'), cv3 = document.getElementById('gl3d');
     this.cv = cv;
+    // 화면 크기 : 휴대폰 주소창이 접히거나 화면을 돌릴 때도 다시 맞춤
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      cv.width = window.innerWidth; cv.height = window.innerHeight;
-      cv3.width = Math.floor(window.innerWidth * dpr); cv3.height = Math.floor(window.innerHeight * dpr);
+      const vv = window.visualViewport;
+      const w = Math.round(vv ? vv.width : window.innerWidth), h = Math.round(vv ? vv.height : window.innerHeight);
+      const dpr = Math.min(window.devicePixelRatio || 1, GL.Touch.enabled ? 1.5 : 2);   // 휴대폰은 발열·속도 위해 1.5배까지
+      cv.width = w; cv.height = h;
+      cv3.width = Math.floor(w * dpr); cv3.height = Math.floor(h * dpr);
+      cv.style.width = cv3.style.width = w + 'px'; cv.style.height = cv3.style.height = h + 'px';
     };
-    window.addEventListener('resize', resize); resize();
+    this.resize = resize;
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', () => setTimeout(resize, 250));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
+    GL.Touch.init(cv);          // 터치 감지를 먼저 해야 그래픽 설정(저전력)을 고를 수 있음
+    resize();
     try { GL.Render.init(cv3, cv); }
     catch (e) { this.fatal = 'WebGL을 켤 수 없는 브라우저입니다: ' + e.message; }
+    // 휴대폰에서 앱 전환 등으로 그래픽이 끊기면 탭해서 다시 불러오기
+    cv3.addEventListener('webglcontextlost', (e) => { e.preventDefault(); this.fatal = '그래픽이 끊겼습니다. 화면을 탭하면 다시 불러옵니다.'; this.reloadOnTap = true; });
+    const reload = () => { if (this.reloadOnTap) location.reload(); };
+    cv.addEventListener('touchstart', reload); cv.addEventListener('mousedown', reload);
+    // 다른 앱으로 나갔다 오면 일시정지
+    document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.state = 'pause'; });
     GL.Input.init(cv);
     GL.Input.isAirborne = () => GL.Party.isAirborne();
     GL.World.reset();
@@ -47,7 +62,15 @@ GL.Main = {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     this.update(dt);
-    if (this.fatal) { const c = this.cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, this.cv.width, this.cv.height); c.fillStyle = '#fff'; c.font = '18px sans-serif'; c.fillText(this.fatal, 40, 60); return; }
+    if (this.fatal) {
+      const c = this.cv.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0);
+      c.fillStyle = '#05070d'; c.fillRect(0, 0, this.cv.width, this.cv.height);
+      c.fillStyle = '#fff'; c.font = '16px sans-serif'; c.textAlign = 'center';
+      c.fillText(this.fatal, this.cv.width / 2, this.cv.height / 2);
+      requestAnimationFrame((t) => this.loop(t)); return;
+    }
+    // 휴대폰 세로 화면이면 가로로 돌리라는 안내만 표시 (게임은 멈춤)
+    if (GL.Touch.enabled && this.cv.height > this.cv.width) { GL.Touch.drawRotate(GL.Render.ctx, this.cv); if (this.state === 'play') this.state = 'pause'; requestAnimationFrame((t) => this.loop(t)); return; }   // v0.4 : 세로 화면에서 루프가 멈추던 버그 수정
     if (this.state !== 'title') GL.Render.draw();
     GL.UI.draw(GL.Render.ctx, this.cv);
     requestAnimationFrame((t) => this.loop(t));
@@ -61,8 +84,8 @@ GL.Main = {
     // 화면 상태별 공통 입력
     for (const ev of events) {
       if (this.state === 'title' && (ev.type === 'confirm' || ev.type === 'click')) { this.newGame(); return; }
-      if (this.state === 'over' && ev.type === 'confirm') { this.retryStage(); return; }
-      if (this.state === 'win' && ev.type === 'confirm') { this.newGame(); return; }
+      if (this.state === 'over' && (ev.type === 'confirm' || ev.type === 'click')) { this.retryStage(); return; }
+      if (this.state === 'win' && (ev.type === 'confirm' || ev.type === 'click')) { this.newGame(); return; }
       if (ev.type === 'pause' && (this.state === 'play' || this.state === 'pause')) {
         if (this.state === 'play') { this.state = 'pause'; I.unlock(); } else { this.state = 'play'; }
         return;

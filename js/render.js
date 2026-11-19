@@ -8,7 +8,7 @@ GL.Render = {
   tgt: { x: 0, y: 0 },
 
   init(glCanvas, uiCanvas) {
-    GL.G3.init(glCanvas);
+    GL.G3.init(glCanvas, GL.Touch.enabled);   // 휴대폰 : 안티에일리어싱 끄고 저전력
     this.canvas = uiCanvas; this.ctx = uiCanvas.getContext('2d');
     this.props = [];
   },
@@ -16,7 +16,7 @@ GL.Render = {
   // 스테이지가 바뀔 때 배경 구조물(데이터 모노리스) 배치
   buildProps() {
     const b = GL.Stage.bounds, list = [];
-    const n = 26;
+    const n = GL.Touch.enabled ? 14 : 26;   // 휴대폰은 배경 구조물 줄임
     for (let i = 0; i < n; i++) {
       const side = i % 4, t = (Math.floor(i / 4) + 0.5) / Math.ceil(n / 4);
       let x, y;

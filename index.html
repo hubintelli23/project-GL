@@ -2,19 +2,22 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Project GL 『이클립스 세븐』 첫 플레이 프로토타입 v0.2 (3인칭 백뷰 3D) -->
-<title>이클립스 세븐 - 프로토타입 v0.2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<!-- Project GL 『이클립스 세븐』 첫 플레이 프로토타입 v0.4 (3인칭 백뷰 3D · PC + 휴대폰) -->
+<title>이클립스 세븐 - 프로토타입 v0.4</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <canvas id="gl3d"></canvas>
 <canvas id="game"></canvas>
 
-<!-- 로드 순서가 중요함: 설정 → 공용 도구 → 입력 → 전투 → 파티 → 적 → 보스 → 스테이지 → 3D 엔진 → 렌더 → UI → 메인 -->
+<!-- 로드 순서가 중요함: 설정 → 공용 도구 → 입력 → 터치 → 전투 → 파티 → 적 → 보스 → 스테이지 → 3D 엔진 → 렌더 → UI → 메인 -->
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/input.js"></script>
+<script src="js/touch.js"></script>
 <script src="js/combat.js"></script>
 <script src="js/party.js"></script>
 <script src="js/enemies.js"></script>

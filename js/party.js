@@ -80,11 +80,14 @@ GL.Party = {
       let f = 0, s = 0;
       if (I.keys.KeyW) f += 1; if (I.keys.KeyS) f -= 1;
       if (I.keys.KeyD) s += 1; if (I.keys.KeyA) s -= 1;
+      const J = GL.Touch && GL.Touch.joy;
+      if (J && J.active && J.mag > 0.15) { f = -J.y; s = J.x; }   // 휴대폰 조이스틱 (화면 위 = 앞)
       const fw = GL.Render.forward(), rt = { x: -fw.y, y: fw.x };
       const mx = fw.x * f + rt.x * s, my = fw.y * f + rt.y * s;
       const len = Math.hypot(mx, my);
       if (len > 0) {
-        let sp = R.moveSpeed * (I.mouse.right ? R.sprintMul : 1) * (1 - p.slow);
+        const sprint = I.mouse.right || (J && J.active && J.sprint);
+        let sp = R.moveSpeed * (sprint ? R.sprintMul : 1) * (1 - p.slow) * Math.min(1, len);
         p.x += mx / len * sp * dt; p.y += my / len * sp * dt;
         p.moveDir = Math.atan2(my, mx);
         // 캐릭터는 이동 방향으로 부드럽게 돌아섬

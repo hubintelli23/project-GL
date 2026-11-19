@@ -4,8 +4,9 @@
 // 좌표 : 게임 (x, y) 평면 = 3D (X, Z) 바닥, 높이 = 3D Y
 // ============================================================
 GL.G3 = {
-  init(canvas) {
-    const gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+  init(canvas, lowPower) {
+    const opts = { antialias: !lowPower, alpha: false, powerPreference: lowPower ? 'low-power' : 'high-performance', preserveDrawingBuffer: false };
+    const gl = canvas.getContext('webgl', opts) || canvas.getContext('experimental-webgl', opts);
     if (!gl) throw new Error('WebGL을 사용할 수 없습니다');
     this.gl = gl; this.canvas = canvas;
 
