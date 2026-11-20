@@ -21,10 +21,13 @@ GL.Party = {
       x: 0, y: 0, z: 0, vz: 0, r: 14, facing: 0,
       iframe: 0, dodgeCharges: C.rules.dodgeCharges, dodgeRe: 0,
       lock: 0, guard: 0, dash: null, plunge: null, slow: 0, hurtFlash: 0, buffer: null, moving: false, moveDir: null,
+      anim: { kind: 'idle', t: 0, dur: 1, step: 0 }, walk: 0,
     };
   },
 
   active() { return this.members[this.activeIdx]; },
+  // 애니메이션 상태 (assets/characters.js 가 읽어서 자세를 만듦)
+  setAnim(kind, dur, step = 0) { this.player.anim = { kind, t: 0, dur, step }; },
   isAirborne() { return this.player.z > 0.5; },
   later(t, fn) { this.timers.push({ t, fn }); },
 
@@ -67,6 +70,9 @@ GL.Party = {
       if (p.dodgeRe <= 0) p.dodgeCharges = R.dodgeCharges;
     }
     p.lock = Math.max(0, p.lock - dt);
+    p.anim.t += dt;
+    if (p.anim.kind !== 'idle' && p.anim.t > p.anim.dur) p.anim = { kind: 'idle', t: 0, dur: 1, step: 0 };
+    if (p.moving) p.walk += dt * (I.mouse.right || (GL.Touch && GL.Touch.joy.sprint) ? 15 : 10);
     if (p.lock <= 0 && p.buffer) { const b = p.buffer; p.buffer = null; if (b === 'light') this.light(); }
 
     // 소프트 락온 대상 갱신 (명조 방식 : 카메라 앞쪽 가까운 적)
@@ -147,6 +153,7 @@ GL.Party = {
     const d = ch.cfg.light[ch.combo - 1];
     const step4 = ch.combo === 4;
     p.lock = step4 ? 0.42 : 0.26;
+    this.setAnim('light', p.lock + 0.08, ch.combo);
     const shatter = step4;                     // 마지막 4타 = 파쇄 속성
 
     if (d.lunge) { p.x += Math.cos(p.facing) * d.lunge; p.y += Math.sin(p.facing) * d.lunge; }
@@ -170,6 +177,7 @@ GL.Party = {
     const p = this.player, ch = this.active(), h = ch.cfg.heavy;
     if (p.z > 0.5 || p.dash) return;
     ch.combo = 0; this.aim();
+    this.setAnim(ch.id === 'baren' ? 'guard' : 'heavy', ch.id === 'baren' ? h.guardTime : 0.5);
     if (ch.id === 'ian') {
       p.lock = 0.45;
       const shape = { kind: 'line', x: p.x, y: p.y, dir: p.facing, len: h.range, w: h.width };
@@ -200,18 +208,19 @@ GL.Party = {
     const p = this.player;
     if (p.z > 0.5 || p.lock > 0 || p.dash) return;
     p.vz = GL.CONFIG.rules.jumpVel;
+    this.setAnim('jump', 0.7);
   },
   jumpAttack(isHeavy) {
     const p = this.player;
     if (p.z <= 0.5 || p.plunge) return;
-    p.plunge = isHeavy ? 'heavy' : 'light'; this.aim();
+    p.plunge = isHeavy ? 'heavy' : 'light'; this.aim(); this.setAnim('plunge', 0.6);
     p.vz = isHeavy ? -1400 : -900;
   },
   landPlunge() {
     const p = this.player, ch = this.active();
     const d = p.plunge === 'heavy' ? ch.cfg.jumpHeavy : ch.cfg.jump;
     const heavy = p.plunge === 'heavy';
-    p.plunge = null; p.lock = 0.25;
+    p.plunge = null; p.lock = 0.25; this.setAnim('land', 0.3);
     GL.Combat.hitArea({ kind: 'circle', x: p.x, y: p.y, r: d.radius }, ch, d.coef, d.frac, { shatter: heavy, stun: d.stun || 0.3, knock: 25 });
     GL.Combat.ring(p.x, p.y, d.radius, heavy ? '#ffffff' : ch.color, 0.35);
     GL.Combat.shards(p.x, p.y, heavy ? 14 : 6);
@@ -228,6 +237,7 @@ GL.Party = {
     const t = 0.18;
     p.dash = { t, vx: Math.cos(a) * R.dodgeDistance / t, vy: Math.sin(a) * R.dodgeDistance / t };
     p.iframe = R.dodgeIframe; p.lock = 0; p.guard = 0; p.buffer = null;
+    this.setAnim('dodge', 0.3);
   },
 
   // ---------- 스킬 Q / E ----------
@@ -236,6 +246,7 @@ GL.Party = {
     if (p.z > 0.5 || p.dash) return;
     if (ch.cd[key] > 0) { GL.Combat.text(p.x, p.y - 36, `${key.toUpperCase()} ${ch.cd[key].toFixed(1)}초`, '#9fb3c8', 13); return; }
     ch.cd[key] = s.cd; ch.combo = 0; p.guard = 0; this.aim();
+    this.setAnim('skill' + key.toUpperCase(), 0.45);
     const C = GL.Combat, f = p.facing, opt = { shatter: true, skill: true };
     C.text(p.x, p.y - 44, s.name, ch.color, 15);
 
@@ -282,6 +293,7 @@ GL.Party = {
     if (p.z > 0.5 || p.dash) return;
     if (ch.ult < ch.ultMax) { C.text(p.x, p.y - 36, `궁극기 ${Math.floor(ch.ult)}/${ch.ultMax}`, '#9fb3c8', 13); return; }
     ch.ult = 0; ch.combo = 0; p.guard = 0; this.aim();
+    this.setAnim('ult', 0.8);
     C.text(p.x, p.y - 56, s.name, '#ffffff', 22);
     if (ch.id === 'ian') {
       p.lock = 0.6; p.iframe = 0.6;

@@ -70,7 +70,7 @@ GL.Combat = {
     if (crit) dmg *= R.critMul;
     if (groggy) dmg *= R.groggyDmgMul;
     if (opts.fixed) dmg = opts.fixed;
-    dmg = Math.round(dmg);
+    dmg = Math.round(dmg * GL.Master.dmgMul());
 
     e.hp -= dmg;
     if (!groggy && frac > 0 && e.fracMax > 0) {
@@ -97,6 +97,7 @@ GL.Combat = {
   // 범위 판정으로 여러 적을 한 번에 때림
   hitArea(shape, ch, coef, frac, opts = {}) {
     let n = 0;
+    GL.Master.recordShape(shape);
     for (const e of GL.World.enemies) {
       if (e.dead || (opts.hitSet && opts.hitSet.has(e))) continue;
       if (this.inShape(shape, e)) {
@@ -136,6 +137,7 @@ GL.Combat = {
   hurtPlayer(atk, coef, opts = {}) {
     const P = GL.Party, p = P.player, ch = P.active(), W = GL.World;
     if (!ch || ch.hp <= 0 || GL.Main.state !== 'play') return false;
+    if (GL.Master.god()) { if (Math.random() < 0.3) this.text(p.x, p.y - 34, '무적', '#ff6b8a', 12); return false; }   // 마스터 모드
     if (opts.ground && p.z > 25) return false;                 // 점프 중엔 바닥 공격 회피
     if (p.iframe > 0 && !opts.unavoidable) { this.text(p.x, p.y - 34, '회피', '#cfe3ff', 14); return false; }
     if (W.buffs.barrier > 0 && !opts.unavoidable) { this.text(p.x, p.y - 34, '절대 경계', '#e0b54a', 14); return false; }

@@ -39,7 +39,7 @@ GL.Input = {
     canvas.addEventListener('mousedown', (e) => {
       this.mouse.x = e.clientX; this.mouse.y = e.clientY;
       if (GL.Touch && GL.Touch.enabled) return;   // 휴대폰은 touch.js 가 처리
-      if (!this.locked) this.lock();
+      if (!this.locked && GL.Main.state === 'play') this.lock();
       if (e.button === 0) {
         this.push('click');
         this.leftDown(this.keys.ControlLeft || this.keys.ControlRight || e.ctrlKey);
@@ -79,6 +79,7 @@ GL.Input = {
       Space: 'jump', ShiftLeft: 'dodge', ShiftRight: 'dodge',
       KeyQ: 'q', KeyE: 'e', KeyR: 'r', Tab: 'observe',
       KeyF: 'interact', KeyM: 'map', Escape: 'pause', Enter: 'confirm',
+      Backquote: 'master', KeyH: 'masterPanel',   // 마스터 모드 : ` 진입/나가기, H 패널
     };
     if (map[code]) this.push(map[code]);
     if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3') {

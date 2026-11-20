@@ -1,6 +1,8 @@
 // ============================================================
-// gl3d.js — 외부 라이브러리 없는 작은 WebGL 엔진
-// 로우폴리 도형(박스·원기둥·구·원뿔·팔면체·고리) + 바닥 그리드 + 바닥 데칼(예고 범위)
+// gl3d.js — 외부 라이브러리 없는 작은 WebGL 엔진 (v0.5)
+// 도형(박스·원기둥·구·원뿔·팔면체·고리·칼날) + 바닥 그리드 + 바닥 데칼 + 하늘
+// 조명 : 태양광 + 하늘/땅 반구광 + 림라이트 + 하이라이트
+// 관절 : T / Rx / Ry / Rz / S / chain 으로 부모-자식 행렬을 이어 붙임
 // 좌표 : 게임 (x, y) 평면 = 3D (X, Z) 바닥, 높이 = 3D Y
 // ============================================================
 GL.G3 = {
@@ -20,10 +22,18 @@ GL.G3 = {
       varying vec3 vN; varying vec3 vW;
       uniform vec4 uColor; uniform float uEmit; uniform vec3 uLight; uniform vec3 uCam;
       uniform vec3 uFog; uniform vec2 uFogR; uniform float uMono;
+      uniform float uSpec; uniform float uShine; uniform float uRim; uniform vec3 uRimC;
+      uniform vec3 uSkyA; uniform vec3 uGroundA; uniform vec3 uSun;
       void main(){
         vec3 n = normalize(vN);
+        vec3 V = normalize(uCam - vW);
+        if (dot(n, V) < 0.0) n = -n;                       // 양면
         float d = max(dot(n, uLight), 0.0);
-        vec3 c = uColor.rgb * (0.42 + 0.68 * d);
+        vec3 amb = mix(uGroundA, uSkyA, 0.5 + 0.5 * n.y);   // 반구광
+        vec3 H = normalize(uLight + V);
+        float sp = pow(max(dot(n, H), 0.0), uShine) * uSpec;
+        float rim = pow(1.0 - max(dot(n, V), 0.0), 2.5) * uRim;
+        vec3 c = uColor.rgb * (amb + d * uSun) + vec3(sp) + uRimC * rim;
         c = mix(c, uColor.rgb, uEmit);
         float f = clamp((length(vW - uCam) - uFogR.x) / (uFogR.y - uFogR.x), 0.0, 1.0);
         c = mix(c, uFog, f);
@@ -43,7 +53,14 @@ GL.G3 = {
         float inside = step(uBounds.x, p.x) * step(p.x, uBounds.x + uBounds.z) * step(uBounds.y, p.y) * step(p.y, uBounds.y + uBounds.w);
         float s = mix(60.0, 40.0, uObs);
         float g = max(grid(p.x, s, 1.4), grid(p.y, s, 1.4));
-        vec3 base = uBase * (0.75 + 0.25 * inside);
+        // 큰 타일 이음새 + 타일마다 다른 명도 + 벽 근처 어둡게
+        float big = max(grid(p.x, 240.0, 2.5), grid(p.y, 240.0, 2.5));
+        vec2 cell = floor(p / 120.0);
+        float tone = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+        vec2 e = min(p - uBounds.xy, uBounds.xy + uBounds.zw - p);
+        float edge = smoothstep(0.0, 160.0, min(e.x, e.y));
+        vec3 base = uBase * (0.75 + 0.25 * inside) * (0.88 + 0.18 * tone) * mix(0.7, 1.0, edge);
+        base += mix(vec3(0.05, 0.10, 0.20), vec3(0.06, 0.25, 0.18), uObs) * big * inside * 0.9;
         vec3 lineC = mix(vec3(0.30, 0.48, 0.75), vec3(0.25, 0.88, 0.66), uObs);
         vec3 c = mix(base, lineC, g * mix(0.22, 0.55, uObs) * inside);
         float scan = (1.0 - smoothstep(0.0, 6.0, abs(p.y - (uBounds.y + mod(uTime * 260.0, uBounds.w))))) * uObs * inside;
@@ -55,8 +72,24 @@ GL.G3 = {
         c = mix(c, vec3(gg) * 0.7, uMono);
         gl_FragColor = vec4(c, 1.0);
       }`;
+    // 하늘 : 시선 방향 높이로 그라데이션 + 흐르는 데이터 띠
+    const fsSky = `
+      precision mediump float;
+      varying vec3 vN; varying vec3 vW;
+      uniform vec3 uCam; uniform vec3 uHorizon; uniform vec3 uZenith; uniform float uTime; uniform float uMono;
+      void main(){
+        vec3 d = normalize(vW - uCam);
+        float h = clamp(d.y, -0.2, 1.0);
+        vec3 c = mix(uHorizon, uZenith, smoothstep(-0.05, 0.6, h));
+        float band = sin(atan(d.z, d.x) * 24.0 + uTime * 0.3) * 0.5 + 0.5;
+        c += uHorizon * 0.25 * band * (1.0 - smoothstep(0.0, 0.25, abs(h - 0.08)));
+        float g = dot(c, vec3(0.3, 0.59, 0.11));
+        c = mix(c, vec3(g), uMono);
+        gl_FragColor = vec4(c, 1.0);
+      }`;
     this.prog = this.program(vs, fs);
     this.progGround = this.program(vs, fsGround);
+    this.progSky = this.program(vs, fsSky);
     this.dyn = gl.createBuffer();
     this.meshes = {
       box: this.mesh(this.boxData()),
@@ -67,11 +100,19 @@ GL.G3 = {
       octa: this.mesh(this.octaData()),
       ring: this.mesh(this.torusData(24, 6, 1, 0.12)),
       plane: this.mesh(this.planeData()),
+      // v0.5 : 부드러운 도형
+      ball: this.mesh(this.smoothSphere(16, 12)),
+      tube: this.mesh(this.smoothCyl(14)),
+      cone2: this.mesh(this.smoothCone(14)),
+      blade: this.mesh(this.bladeData()),
+      wedge: this.mesh(this.wedgeData()),
+      thinRing: this.mesh(this.torusData(40, 6, 1, 0.04)),
     };
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    this.frame = { light: this.norm([0.45, 0.85, 0.3]), fog: [0.02, 0.03, 0.06], fogR: [500, 1500], mono: 0 };
+    this.frame = { light: this.norm([0.45, 0.85, 0.3]), fog: [0.02, 0.03, 0.06], fogR: [500, 1500], mono: 0,
+      sun: [0.95, 0.97, 1.0], skyA: [0.44, 0.50, 0.64], groundA: [0.16, 0.16, 0.22], rimC: [0.45, 0.7, 1.0] };
   },
 
   program(vsrc, fsrc) {
@@ -153,6 +194,92 @@ GL.G3 = {
   planeData() { const o = []; this.quad(o, [-0.5, 0, 0.5], [0.5, 0, 0.5], [0.5, 0, -0.5], [-0.5, 0, -0.5]); return this.fixWindingUp(o); },
   fixWindingUp(o) { for (let k = 3; k < o.length; k += 6) { o[k] = 0; o[k + 1] = 1; o[k + 2] = 0; } return o; },
 
+  // ---------- 부드러운 도형 (꼭짓점 법선) ----------
+  smoothSphere(seg, rings) {
+    const o = [], P = (i, j) => { const th = i / seg * 6.2832, ph = j / rings * Math.PI; return [Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)]; };
+    const V = (p) => o.push(p[0], p[1], p[2], p[0], p[1], p[2]);
+    for (let j = 0; j < rings; j++) for (let i = 0; i < seg; i++) {
+      const a = P(i, j), b = P(i + 1, j), c = P(i + 1, j + 1), d = P(i, j + 1);
+      V(a); V(b); V(c); V(a); V(c); V(d);
+    }
+    return o;
+  },
+  smoothCyl(seg) { // 반지름 1, 높이 0~1, 옆면 부드럽게 + 뚜껑
+    const o = [];
+    for (let i = 0; i < seg; i++) {
+      const a0 = i / seg * 6.2832, a1 = (i + 1) / seg * 6.2832;
+      const c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+      o.push(c0, 0, s0, c0, 0, s0, c1, 0, s1, c1, 0, s1, c1, 1, s1, c1, 0, s1);
+      o.push(c0, 0, s0, c0, 0, s0, c1, 1, s1, c1, 0, s1, c0, 1, s0, c0, 0, s0);
+      o.push(0, 1, 0, 0, 1, 0, c1, 1, s1, 0, 1, 0, c0, 1, s0, 0, 1, 0);
+      o.push(0, 0, 0, 0, -1, 0, c0, 0, s0, 0, -1, 0, c1, 0, s1, 0, -1, 0);
+    }
+    return o;
+  },
+  smoothCone(seg) {
+    const o = [];
+    for (let i = 0; i < seg; i++) {
+      const a0 = i / seg * 6.2832, a1 = (i + 1) / seg * 6.2832, am = (a0 + a1) / 2;
+      const n = (a) => this.norm([Math.cos(a), 0.6, Math.sin(a)]);
+      const n0 = n(a0), n1 = n(a1), nm = n(am);
+      o.push(Math.cos(a0), 0, Math.sin(a0), ...n0, 0, 1, 0, ...nm, Math.cos(a1), 0, Math.sin(a1), ...n1);
+      o.push(0, 0, 0, 0, -1, 0, Math.cos(a0), 0, Math.sin(a0), 0, -1, 0, Math.cos(a1), 0, Math.sin(a1), 0, -1, 0);
+    }
+    return o;
+  },
+  // 칼날 : +X 방향으로 뻗는 납작한 마름모 단면 (길이 1, 끝이 뾰족)
+  bladeData() {
+    const o = [], w = 0.09, t = 0.025;
+    const pts = [[0, w, 0], [0.82, w * 0.8, 0], [1, 0, 0], [0.82, -w * 0.8, 0], [0, -w, 0]];
+    for (const side of [1, -1]) {
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        this.tri(o, [a[0], a[1], 0], [b[0], b[1], 0], [(a[0] + b[0]) / 2 * 0.9, 0, t * side]);
+        this.tri(o, [a[0], a[1], 0], [(a[0] + b[0]) / 2 * 0.9, 0, t * side], [0, 0, t * side]);
+      }
+    }
+    return o;
+  },
+  // 쐐기 : 아래가 넓고 위가 좁은 판 (망토 자락·장갑판용)
+  wedgeData() {
+    const o = [];
+    this.quad(o, [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.3, 0.5, 0.2], [-0.3, 0.5, 0.2]);
+    this.quad(o, [0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.3, 0.5, -0.2], [0.3, 0.5, -0.2]);
+    this.quad(o, [0.5, -0.5, 0.5], [0.5, -0.5, -0.5], [0.3, 0.5, -0.2], [0.3, 0.5, 0.2]);
+    this.quad(o, [-0.5, -0.5, -0.5], [-0.5, -0.5, 0.5], [-0.3, 0.5, 0.2], [-0.3, 0.5, -0.2]);
+    this.quad(o, [-0.3, 0.5, 0.2], [0.3, 0.5, 0.2], [0.3, 0.5, -0.2], [-0.3, 0.5, -0.2]);
+    this.quad(o, [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5]);
+    return this.fixWinding(o);
+  },
+
+  // ---------- 관절용 행렬 ----------
+  T(x, y, z) { return new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]); },
+  S(x, y, z) { return new Float32Array([x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]); },
+  Rx(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]); },
+  Ry(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]); },
+  Rz(a) { const c = Math.cos(a), s = Math.sin(a); return new Float32Array([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]); },
+  chain(...ms) { let m = ms[0]; for (let i = 1; i < ms.length; i++) m = this.mul(m, ms[i]); return m; },
+  // 게임 좌표(x, y=바닥 깊이) + 높이 h + 바라보는 각도 → 로컬 좌표계 (+X 앞, +Y 위, +Z 오른쪽)
+  root(x, h, y, facing) { return this.mul(this.T(x, h, y), this.Ry(-facing)); },
+  pos(m) { return [m[12], m[13], m[14]]; },
+
+  // ---------- 블렌딩 : 'add' = 빛 더하기 (이펙트), 'normal' ----------
+  blend(mode) {
+    const gl = this.gl;
+    if (mode === 'add') gl.blendFunc(gl.SRC_ALPHA, gl.ONE); else gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  },
+
+  sky(horizon, zenith, time) {
+    const gl = this.gl, pr = this.use(this.progSky);
+    gl.uniform3fv(pr.u.uHorizon, horizon); gl.uniform3fv(pr.u.uZenith, zenith); gl.uniform1f(pr.u.uTime, time);
+    gl.uniformMatrix4fv(pr.u.uM, false, this.model(this.eye[0], this.eye[1], this.eye[2], 0, 3000, 3000, 3000));
+    gl.depthMask(false);
+    this.bindMesh(this.meshes.ball);
+    gl.drawArrays(gl.TRIANGLES, 0, this.meshes.ball.n);
+    gl.depthMask(true);
+    this._cur = null;
+  },
+
   mesh(data) {
     const gl = this.gl, b = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
@@ -214,6 +341,7 @@ GL.G3 = {
     gl.uniform3fv(pr.u.uFog, F.fog);
     gl.uniform2fv(pr.u.uFogR, F.fogR);
     gl.uniform1f(pr.u.uMono, F.mono);
+    if (pr.u.uSun) { gl.uniform3fv(pr.u.uSun, F.sun); gl.uniform3fv(pr.u.uSkyA, F.skyA); gl.uniform3fv(pr.u.uGroundA, F.groundA); gl.uniform3fv(pr.u.uRimC, F.rimC); }
     return pr;
   },
   bindMesh(m) {
@@ -238,12 +366,16 @@ GL.G3 = {
   },
 
   // 도형 하나 그리기
-  draw(meshName, M, color, emit = 0) {
+  // mat : { spec 하이라이트 세기, shine 날카로움, rim 테두리 빛 }  (금속 = spec 높게)
+  draw(meshName, M, color, emit = 0, mat) {
     const gl = this.gl, pr = this.prog;
     if (this._cur !== pr) { this.use(pr); this._cur = pr; }
     gl.uniformMatrix4fv(pr.u.uM, false, M);
     gl.uniform4fv(pr.u.uColor, color);
     gl.uniform1f(pr.u.uEmit, emit);
+    gl.uniform1f(pr.u.uSpec, mat && mat.spec !== undefined ? mat.spec : 0.12);
+    gl.uniform1f(pr.u.uShine, mat && mat.shine ? mat.shine : 20);
+    gl.uniform1f(pr.u.uRim, mat && mat.rim !== undefined ? mat.rim : 0.35);
     const m = this.meshes[meshName];
     this.bindMesh(m);
     gl.drawArrays(gl.TRIANGLES, 0, m.n);
@@ -264,6 +396,7 @@ GL.G3 = {
     gl.uniformMatrix4fv(pr.u.uM, false, this.model(0, 0, 0));
     gl.uniform4fv(pr.u.uColor, color);
     gl.uniform1f(pr.u.uEmit, 1);
+    gl.uniform1f(pr.u.uSpec, 0); gl.uniform1f(pr.u.uShine, 8); gl.uniform1f(pr.u.uRim, 0);
     gl.drawArrays(gl.TRIANGLES, 0, data.length / 6);
   },
   // 데칼 도형 만들기

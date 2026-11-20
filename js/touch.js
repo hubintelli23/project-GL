@@ -84,10 +84,16 @@ GL.Touch = {
     e.preventDefault();
     const I = GL.Input, st = GL.Main.state;
     this.tryFullscreen();
-    if (st !== 'play') { I.push('click'); return; }   // 타이틀·일시정지·결과 화면 : 탭 = 진행
+    // 세 손가락 탭 = 마스터 모드 진입 / 나가기
+    if (e.touches.length >= 3) { I.push('master'); return; }
+    if (st !== 'play') {   // 타이틀·일시정지·결과 화면·마스터 패널 : 탭 = 진행 / 버튼 누르기
+      const t0 = e.changedTouches[0]; I.mouse.x = t0.clientX; I.mouse.y = t0.clientY;
+      I.push('click'); return;
+    }
     this.layout(this.canvas);
     for (const t of e.changedTouches) {
       const x = t.clientX, y = t.clientY;
+      if (GL.Master.badgeHit(x, y)) { I.push('masterPanel'); continue; }   // MASTER 표시 탭 = 패널
       const b = this.hitButton(x, y);
       if (b) { this.btnTouch[t.identifier] = b.id; this.pressed[b.id] = true; this.press(b.id); continue; }
       const pi = this.hitParty(x, y);

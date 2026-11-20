@@ -83,6 +83,10 @@ GL.Main = {
 
     // 화면 상태별 공통 입력
     for (const ev of events) {
+      // 마스터 모드 (테스트)
+      if (ev.type === 'master') { GL.Master.toggle(); continue; }
+      if (ev.type === 'masterPanel') { GL.Master.togglePanel(); continue; }
+      if (this.state === 'master') { if (ev.type === 'click') GL.Master.click(I.mouse.x, I.mouse.y); if (ev.type === 'pause') GL.Master.closePanel(); continue; }
       if (this.state === 'title' && (ev.type === 'confirm' || ev.type === 'click')) { this.newGame(); return; }
       if (this.state === 'over' && (ev.type === 'confirm' || ev.type === 'click')) { this.retryStage(); return; }
       if (this.state === 'win' && (ev.type === 'confirm' || ev.type === 'click')) { this.newGame(); return; }
@@ -93,7 +97,9 @@ GL.Main = {
       if (this.state === 'pause' && ev.type === 'click') { this.state = 'play'; return; }
       if (ev.type === 'map' && this.state === 'play') GL.UI.mapOpen = !GL.UI.mapOpen;
     }
+    GL.Master.update(dt);
     if (this.state !== 'play') return;
+    dt *= GL.Master.timeScale();
 
     for (const ev of events) {
       if (ev.type === 'interact') GL.Stage.interact();
@@ -104,7 +110,7 @@ GL.Main = {
     GL.World.time += dt; this.elapsed = (this.elapsed || 0) + dt;
     GL.Render.updateCamera(dt);
     GL.Party.update(dt);
-    for (const e of GL.World.enemies) if (!e.dead) e.update(dt);
+    if (!GL.Master.frozen()) for (const e of GL.World.enemies) if (!e.dead) e.update(dt);
     this.separate();
     GL.Combat.update(dt);
     GL.Stage.update(dt);
