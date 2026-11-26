@@ -22,6 +22,13 @@ GL.Assets.Effects = {
     for (const s of W.pShots) {
       const a = Math.atan2(s.vy, s.vx);
       if (s.dagger) GL.Assets.Weapons.kay(G, G.root(s.x, 26, s.y, a), { glow: 1 });
+      else if (s.chakram) {   // 노아 차크람 / 잔영
+        const M = G.chain(G.T(s.x, 28, s.y), G.Ry(t * 18));
+        G.draw('ring', G.chain(M, G.S(11, 11, 11)), this.c(s.color, s.ghost ? 0.5 : 1), 0.6, { spec: 0.9, shine: 40 });
+        for (let i = 0; i < 4; i++) G.draw('blade', G.chain(M, G.Ry(i * 1.5708), G.T(9, 0, 0), G.Rx(Math.PI / 2), G.S(7, 20, 26)), this.c('#ffffff', s.ghost ? 0.5 : 1), 0.7);
+      }
+      else if (s.wave) G.draw('ball', G.chain(G.root(s.x, 22, s.y, a), G.S(10, 16, s.r)), this.c('#ffffff', 0.85), 1);   // 세레나 광휘 파동
+      else if (s.orb) { G.draw('ball', G.chain(G.T(s.x, 32, s.y), G.S(6, 6, 6)), this.c('#ffffff'), 1); G.draw('thinRing', G.chain(G.T(s.x, 32, s.y), G.Rx(t * 6), G.S(10, 10, 10)), this.c(s.color), 1); }
       else G.draw('ball', G.chain(G.T(s.x, 30, s.y), G.S(s.r, s.r, s.r)), this.c(s.color || '#ffffff'), 1);
     }
     // 유리 파편 / 불꽃
@@ -30,6 +37,27 @@ GL.Assets.Effects = {
       if (f.kind === 'shard') {
         const hh = 12 + Math.sin(k * Math.PI) * 55;
         G.draw('octa', G.chain(G.T(f.x, hh, f.y), G.Ry(f.rot + k * 8), G.Rx(k * 6), G.S(f.size * 0.7, f.size, f.size * 0.25)), [0.85, 0.95, 1, 1 - k * 0.7], 0.55, this.glass);
+      }
+    }
+    // 클레아 창조의 모루 낙하 / 새 장판의 입체 부분
+    for (const f of W.fx) {
+      if (f.kind === 'anvil') {
+        const k = f.t / f.life, h = 420 * (1 - k * k);
+        G.draw('box', G.chain(G.T(f.x, h + 20, f.y), G.S(70, 26, 44)), this.c('#7a6a5a'), 0.1, { spec: 0.8, shine: 40 });
+        G.draw('box', G.chain(G.T(f.x, h + 40, f.y), G.S(90, 14, 30)), this.c('#9a8a7a'), 0.1, { spec: 0.8, shine: 40 });
+        G.draw('box', G.chain(G.T(f.x, h + 6, f.y), G.S(40, 10, 36)), this.c('#ff9f5a'), 0.6);
+      }
+    }
+    for (const f of W.fields) {
+      if (f.kind === 'prison') for (let i = 0; i < 10; i++) { const a = i * 0.628 + t * 0.4; G.draw('tube', G.chain(G.T(f.x + Math.cos(a) * f.r, 0, f.y + Math.sin(a) * f.r), G.S(2, 60, 2)), this.c('#bfe8ff', 0.9), 0.8); }
+      if (f.kind === 'spikes') for (let i = 0; i < 12; i++) { const a = i * 2.4, r = (i % 4 + 1) / 4 * f.r * 0.85; G.draw('octa', G.chain(G.T(f.x + Math.cos(a) * r, 10, f.y + Math.sin(a) * r), G.Ry(a), G.S(4, 16 + (i % 3) * 6, 4)), [0.85, 0.95, 1, 0.85], 0.4, this.glass); }
+    }
+    // 이안 인과 역류 : 칠흑의 먹물 노이즈가 몸에서 뿜어져 나옴
+    if (GL.Ian.backflow && GL.Party.active().id === 'ian') {
+      const pp = GL.Party.player, forced = GL.Ian.backflow.mode === 'forced';
+      for (let i = 0; i < 8; i++) {
+        const a = t * 2 + i * 0.785, r = 14 + Math.sin(t * 5 + i) * 5;
+        G.draw('cone2', G.chain(G.T(pp.x + Math.cos(a) * r, pp.z * 0.6 + 6, pp.y + Math.sin(a) * r), G.Rz(Math.sin(t * 3 + i) * 0.4), G.S(4, 26 + Math.sin(t * 7 + i) * 10, 4)), this.c(forced && i % 3 === 0 ? '#5a0010' : '#050505', 0.9), 0, { spec: 0.6, rim: 0.2 });
       }
     }
     // 회복 데이터
@@ -90,6 +118,18 @@ GL.Assets.Effects = {
           G.decal(G.circle(f.x, f.y, f.r), 0.8, [0.8, 0.08, 0.2, 0.3]);
           for (let i = 0; i < 7; i++) G.decal(G.rect(f.x, f.y, i * 0.9 + f.x, f.r * (0.6 + (i % 3) * 0.2), 3), 0.9, [1, 0.35, 0.45, 0.8]);
         }
+      } else if (f.kind === 'prison') {
+        G.decal(G.circle(f.x, f.y, f.r), 0.8, [0.5, 0.78, 0.9, 0.15]);
+        G.decal(G.ringStrip(f.x, f.y, f.r - 4, f.r), 0.9, [0.75, 0.9, 1, 0.9]);
+      } else if (f.kind === 'garden') {
+        G.decal(G.circle(f.x, f.y, f.r), 0.8, [0.95, 0.75, 1, 0.16]);
+        G.decal(G.ringStrip(f.x, f.y, f.r - 3, f.r), 0.9, [1, 0.9, 1, 0.8]);
+        for (let i = 0; i < 9; i++) { const a = i * 0.7 + t * 0.3, r = (i % 3 + 1) / 3 * f.r * 0.8; G.decal(G.circle(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r, 6, 6), 0.95, [1, 0.95, 1, 0.7]); }
+      } else if (f.kind === 'spikes') {
+        G.decal(G.circle(f.x, f.y, f.r), 0.8, [0.8, 0.95, 1, 0.14]);
+      } else if (f.kind === 'timestop') {
+        G.decal(G.ringStrip(f.x, f.y, f.r - 4, f.r), 0.9, [0.75, 0.9, 1, 0.8]);
+        for (let i = 0; i < 12; i++) G.decal(G.rect(f.x + Math.cos(i * 0.5236) * (f.r - 22), f.y + Math.sin(i * 0.5236) * (f.r - 22), i * 0.5236, 16, 3), 0.95, [0.75, 0.9, 1, 0.7]);
       } else if (f.kind === 'cut') {
         const s = f.shape;
         G.decal(G.rect(s.x, s.y, s.dir, s.len, s.w), 0.8, [0.8, 1, 0.95, 0.12 + 0.05 * Math.sin(t * 20)]);
@@ -106,7 +146,7 @@ GL.Assets.Effects = {
     const t0 = GL.World.time;
     for (const t of GL.World.tele) {
       const k = Math.min(1, t.t / t.warn);
-      const col = t.ghost ? [0.7, 0.43, 1] : (t.red ? [1, 0.16, 0.31] : [1, 0.59, 0.24]);
+      const col = t.ally ? [1, 0.78, 0.4] : t.ghost ? [0.7, 0.43, 1] : (t.red ? [1, 0.16, 0.31] : [1, 0.59, 0.24]);
       G.decal(this.shapeTris(G, t), 1.0, [...col, 0.1 + 0.2 * k]);
       const inner = { ...t };
       if (t.kind === 'line') inner.len = t.len * k; else inner.r = (t.r || 60) * k;
@@ -150,6 +190,17 @@ GL.Assets.Effects = {
       } else if (f.kind === 'line') {
         G.decal(G.rect(f.x, f.y, f.dir, f.len, f.w * (1 - k * 0.6)), 20, [c[0], c[1], c[2], (1 - k) * 0.55]);
         G.decal(G.rect(f.x, f.y, f.dir, f.len, Math.max(2, f.w * 0.2)), 20.5, [1, 1, 1, (1 - k) * 0.9]);
+      } else if (f.kind === 'erase') {   // 소거 : 심해 청색 입자가 수평으로 흩어지며 소멸
+        G.draw('box', G.chain(G.T(f.x, f.h, f.y), G.Ry(k * 3), G.S(6 * (1 - k) + 1, 6 * (1 - k) + 1, 6 * (1 - k) + 1)), [0.16, 0.42, 1, 1 - k], 1);
+      } else if (f.kind === 'beam') {    // 노아 만화경 광선
+        G.draw('tube', G.chain(G.T(f.x, 0, f.y), G.S(10 * (1 - k) + 3, 500, 10 * (1 - k) + 3)), [0.78, 0.96, 1, 1 - k], 1);
+        G.decal(G.circle(f.x, f.y, 45 * (1 - k * 0.5)), 1.2, [0.78, 0.96, 1, (1 - k) * 0.6]);
+      } else if (f.kind === 'lens') {    // 노아 렌즈 광선 : 공중의 유리 렌즈
+        G.draw('ring', G.chain(G.root(f.x, 34, f.y, f.dir), G.Rz(Math.PI / 2), G.S(26, 26, 26)), [0.78, 0.96, 1, 1 - k], 1);
+        G.draw('ball', G.chain(G.root(f.x, 34, f.y, f.dir), G.S(3, 24, 24)), [0.9, 1, 1, (1 - k) * 0.5], 1);
+      } else if (f.kind === 'kaleido') { // 노아 만화경 렌즈 배열
+        const pp = GL.Party.player;
+        for (let i = 0; i < 6; i++) { const a = t * 1.5 + i * 1.047; G.draw('ring', G.chain(G.T(pp.x + Math.cos(a) * 90, 200, pp.y + Math.sin(a) * 90), G.Rx(0.6), G.S(22, 22, 22)), [0.78, 0.96, 1, 1 - k * 0.6], 1); }
       } else if (f.kind === 'spark') {
         const a = Math.atan2(f.vy, f.vx);
         G.draw('box', G.chain(G.root(f.x, 28, f.y, a), G.S(10 * (1 - k) + 2, 1.6, 1.6)), [c[0], c[1], c[2], 1 - k], 1);

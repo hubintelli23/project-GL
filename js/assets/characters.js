@@ -27,6 +27,35 @@ GL.Assets.Characters = {
       coat: '#3a2a55', coatTrim: '#b48cff', shirt: '#4b3a6a', pants: '#2a1f3a', boots: '#120c1a',
       scarf: '#b48cff', coatLength: 'cape', weapon: 'kay', dual: true, eye: '#ff6b9a',
     },
+    taron: {
+      scale: 1.05, shoulder: 10, build: 1.1,
+      skin: '#e6c9b0', hair: '#9aa6b2', hairStyle: 'short',
+      coat: '#2a3a48', coatTrim: '#7fc8e8', shirt: '#3b4a5a', pants: '#1f2a34', boots: '#12181f',
+      gauntlet: '#9fb3c8', coatLength: 'short', weapon: 'taron', eye: '#7fc8e8',
+    },
+    serena: {
+      scale: 0.95, shoulder: 8, build: 0.88,
+      skin: '#f6e3d6', hair: '#f2e6ff', hairStyle: 'long',
+      coat: '#f4eefc', coatTrim: '#e9b8ff', shirt: '#d9c6f0', pants: '#cbb8e6', boots: '#7a6a90',
+      coatLength: 'robe', weapon: 'serena', eye: '#c08ae8',
+    },
+    clea: {
+      scale: 1.0, shoulder: 9.5, build: 1.05,
+      skin: '#f0d2bc', hair: '#c4572a', hairStyle: 'ponytail',
+      coat: '#3a2a20', coatTrim: '#ff9f5a', shirt: '#5a4030', pants: '#2a201a', boots: '#16100c',
+      armor: '#8a6a50', coatLength: 'short', weapon: 'clea', eye: '#ff9f5a',
+    },
+    noah: {
+      scale: 0.92, shoulder: 8, build: 0.85,
+      skin: '#f2dcd0', hair: '#bfe9ff', hairStyle: 'bob',
+      coat: '#1e3a4a', coatTrim: '#8fe3ff', shirt: '#e8f8ff', pants: '#1a2c38', boots: '#0e1a22',
+      scarf: '#8fe3ff', coatLength: 'cape', weapon: 'noah', dual: true, eye: '#8fe3ff',
+    },
+  },
+  // 이안 인과 역류 중 외형 : 칠흑 (자의 발동 = 흰 눈 / 강제 폭주 = 붉은 눈)
+  backflowLook(def, mode) {
+    return Object.assign({}, def, { coat: '#050505', coatTrim: mode === 'forced' ? '#ff2040' : '#e8e8e8', shirt: '#101010', pants: '#080808', boots: '#000000',
+      hair: '#1a1a1a', scarf: mode === 'forced' ? '#ff2040' : '#3a3a3a', eye: mode === 'forced' ? '#ff2040' : '#ffffff' });
   },
 
   c(hex, a = 1) { return GL.G3.rgba(hex, a); },
@@ -105,6 +134,11 @@ GL.Assets.Characters = {
         P.crouch = 9 * k; P.L.hip = P.R.hip = 0.9 * k; P.L.knee = P.R.knee = 1.6 * k; P.aL.pitch = P.aR.pitch = 1.0; P.lean = 0.5 * k;
         break;
       }
+      case 'erase': {   // 소거 : 양팔을 앞으로 모아 청색 빛을 발현
+        P.aL.pitch = P.aR.pitch = 1.5; P.aL.yaw = 0.35; P.aR.yaw = -0.35; P.aL.elbow = P.aR.elbow = 0.1;
+        P.lean = 0.3; P.crouch = 3; P.glow = 1; P.L.hip = 0.4; P.R.hip = -0.3;
+        break;
+      }
       case 'dodge': {
         P.crouch = 7; P.lean = 0.7; P.L.hip = 1.1; P.R.hip = -0.2; P.L.knee = 1.4; P.R.knee = 0.9; P.aL.pitch = P.aR.pitch = -0.6; P.coatSwing = 0.9;
         break;
@@ -118,10 +152,13 @@ GL.Assets.Characters = {
   drawPlayer(G) {
     const p = GL.Party.player, ch = GL.Party.active(), t = GL.World.time;
     if (!ch) return;
-    const def = this.defs[ch.id] || this.defs.ian;
+    let def = this.defs[ch.id] || this.defs.ian;
+    const bf = ch.id === 'ian' && GL.Ian.backflow;
+    if (bf) def = this.backflowLook(def, bf.mode);
     const P = this.pose(p, def, t);
+    if (bf) P.glow = 1;
     const flash = p.hurtFlash > 0, alpha = p.iframe > 0 ? 0.55 : 1;
-    this.humanoid(G, def, P, p.x, p.z * 0.6, p.y, p.facing, { flash, alpha, t, observe: GL.World.observe.on });
+    this.humanoid(G, def, P, p.x, p.z * 0.6, p.y, p.facing, { flash, alpha, t, observe: GL.World.observe.on && !bf, backflow: bf });
   },
 
   humanoid(G, def, P, x, h, y, facing, o) {
@@ -152,6 +189,9 @@ GL.Assets.Characters = {
     if (def.coatLength === 'long') {
       for (const z of [-4.5 * b, 4.5 * b]) G.draw('wedge', G.chain(Mt, G.T(-3, 2, z), G.Rz(-0.15 - sw), G.T(0, -9, 0), G.S(4, 18, 6)), C(def.coat), 0, this.cloth);
       G.draw('box', G.chain(Mt, G.T(-4.5, 2, 0), G.Rz(-0.1 - sw), G.T(0, -8.5, 0), G.S(1.2, 17, 1.4)), C(def.coatTrim), 0.6);
+    } else if (def.coatLength === 'robe') {   // 긴 사제복 치마
+      G.draw('cone2', G.chain(R0, G.T(0, Math.max(2, hipY - 22), 0), G.Ry(-facing * 0), G.S(11 * b + sw * 3, 26, 11 * b + sw * 2)), C(def.coat), 0, this.cloth);
+      G.draw('tube', G.chain(R0, G.T(0, Math.max(2, hipY - 22), 0), G.S(11.2 * b + sw * 3, 1.5, 11.2 * b + sw * 2)), C(def.coatTrim), 0.4);
     } else if (def.coatLength === 'cape') {
       G.draw('wedge', G.chain(Mt, G.T(-5, torso, 0), G.Rz(-0.08 - sw * 0.8), G.T(0, -15, 0), G.S(2, 30, 17)), C(def.coat), 0, this.cloth);
     } else {
@@ -176,7 +216,8 @@ GL.Assets.Characters = {
       const Me = G.chain(Ms, G.T(0, -upper, 0), G.Rz(A.elbow));
       G.draw('tube', G.chain(Me, G.T(0, -fore, 0), G.S(2.2 * b, fore, 2.2 * b)), C(def.coat), 0, this.cloth);
       G.draw('tube', G.chain(Me, G.T(0, -fore + 0.5, 0), G.S(2.5 * b, 2.4, 2.5 * b)), C(def.coatTrim), 0.3);   // 소매 끝
-      G.draw('ball', G.chain(Me, G.T(0, -fore - 1.5, 0), G.S(2.4, 2.6, 2.4)), C(def.skin), 0, this.skinM);
+      G.draw('ball', G.chain(Me, G.T(0, -fore - 1.5, 0), G.S(2.4, 2.6, 2.4)), C(def.gauntlet || def.skin), def.gauntlet ? 0.1 : 0, def.gauntlet ? { spec: 0.9, shine: 40 } : this.skinM);
+      if (def.gauntlet) G.draw('tube', G.chain(Me, G.T(0, -fore + 0.5, 0), G.S(2.9, 4, 2.9)), C(def.gauntlet), 0.1, { spec: 0.9, shine: 40 });
       hands[side] = G.chain(Me, G.T(0, -fore - 2, 0));
     }
 
@@ -202,8 +243,10 @@ GL.Assets.Characters = {
     } else if (def.dual) {
       for (const side of ['L', 'R']) {
         const grip = G.chain(hands[side], G.Rz(-Math.PI / 2 + 0.25));
-        W[def.weapon](G, grip, { glow, t: o.t });
+        W[def.weapon](G, grip, { glow, t: o.t, side, backflow: o.backflow });
       }
+    } else if (W[def.weapon]) {   // 한 손/양손 무기 (삼절곤 · 향로 메이스 · 워해머)
+      W[def.weapon](G, G.chain(hands.R, G.Rz(-Math.PI / 2 + 0.25)), { glow, t: o.t });
     }
   },
 
@@ -218,6 +261,17 @@ GL.Assets.Characters = {
     } else if (def.hairStyle === 'short') {
       G.draw('ball', G.chain(Mh, G.T(-0.6, 2.2, 0), G.S(7.0 * s, 6.0 * s, 6.8 * s)), C(def.hair), 0, { spec: 0.2 });
       G.draw('tube', G.chain(Mh, G.T(0, 3.2, 0), G.S(7.1 * s, 1.6, 7.1 * s)), C(def.coatTrim), 0.3, { spec: 0.7, shine: 30 }); // 머리띠
+    } else if (def.hairStyle === 'long') {
+      G.draw('ball', G.chain(Mh, G.T(-0.8, 1.4, 0), G.S(7.2 * s, 7.0 * s, 7.2 * s)), C(def.hair), 0, { spec: 0.5, shine: 30, rim: 0.5 });
+      G.draw('wedge', G.chain(Mh, G.T(-4.5, -8, 0), G.Rz(0.12 + P.coatSwing * 0.3), G.S(3, 22, 13)), C(def.hair), 0, { spec: 0.5, shine: 30, rim: 0.5 });
+      G.draw('thinRing', G.chain(Mh, G.T(0, 3.5, 0), G.Rz(0.25), G.S(7.6, 7.6, 7.6)), C(def.coatTrim), 0.6);   // 머리 장식
+    } else if (def.hairStyle === 'ponytail') {
+      G.draw('ball', G.chain(Mh, G.T(-0.6, 1.8, 0), G.S(7.1 * s, 6.4 * s, 7.0 * s)), C(def.hair), 0, { spec: 0.4, shine: 26 });
+      G.draw('tube', G.chain(Mh, G.T(-6, 3, 0), G.Rz(2.4 + P.coatSwing * 0.4), G.S(2.2, 13, 2.2)), C(def.hair), 0, { spec: 0.4 });
+      G.draw('box', G.chain(Mh, G.T(2, 5.5, 0), G.S(6, 1.6, 9)), C(def.coatTrim), 0.3);   // 고글
+    } else if (def.hairStyle === 'bob') {
+      G.draw('ball', G.chain(Mh, G.T(-0.6, 0.6, 0), G.S(7.6 * s, 7.4 * s, 7.8 * s)), C(def.hair), 0, { spec: 0.5, shine: 30, rim: 0.6 });
+      G.draw('box', G.chain(Mh, G.T(5.2, 3.2, 0), G.S(1.4, 3, 12)), C(def.hair), 0, { spec: 0.4 });   // 앞머리
     } else if (def.hairStyle === 'hood') {
       G.draw('ball', G.chain(Mh, G.T(-1.2, 1.2, 0), G.S(8.2 * s, 8.4 * s, 8.0 * s)), C(def.coat), 0, this.cloth);
       G.draw('cone2', G.chain(Mh, G.T(-5, 3, 0), G.Rz(1.9), G.S(4, 8, 4)), C(def.coat), 0, this.cloth);

@@ -23,11 +23,18 @@ GL.Enemy = class {
     GL.Combat.text(this.x, this.y - this.r - 24, '그로기!', '#ffe066', 22);
     GL.Combat.shards(this.x, this.y, 18);
     GL.World.shake = Math.max(GL.World.shake, 6);
+    if (this.boss || this.elite) GL.Haptics.groggy();
     if (this.onGroggy) this.onGroggy();
   }
 
   update(dt) {
     this.hitFlash = Math.max(0, this.hitFlash - dt);
+    // 태론 시간 정지 : 모든 행동 멈춤
+    if (this.frozenT > 0) { this.frozenT -= dt; return; }
+    if (this.slowT > 0) this.slowT -= dt;
+    if (this.launchT > 0) this.launchT -= dt;
+    // 태론 억제 결계 : 스킬(공격) 발동 봉인
+    if (this.sealT > 0) { this.sealT -= dt; this.cd = Math.max(this.cd, 0.3); }
     if (this.markWeak > 0) this.markWeak -= dt;
     if (this.defDownT > 0) this.defDownT -= dt;
     if (this.bleedT > 0) {
@@ -56,6 +63,7 @@ GL.Enemy = class {
   }
 
   moveToward(tx, ty, sp, dt) {
+    if (this.slowT > 0) sp *= 0.5;   // 둔화
     const a = Math.atan2(ty - this.y, tx - this.x);
     this.x += Math.cos(a) * sp * dt; this.y += Math.sin(a) * sp * dt;
   }
@@ -85,7 +93,7 @@ GL.Shard = class extends GL.Enemy {
     this.facing = this.angP();
     if (this.state === 'chase') {
       this.moveToward(this.player().x, this.player().y, this.speed, dt);
-      if (this.distP() < 70) {
+      if (this.distP() < 70 && !(this.sealT > 0)) {
         this.state = 'charge';
         GL.Combat.telegraph({ kind: 'circle', x: this.x, y: this.y, r: this.cfg.blastR, warn: this.cfg.chargeTime, owner: this, follow: true,
           onFire: (t) => {

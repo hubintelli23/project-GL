@@ -24,6 +24,7 @@ GL.Master = {
     ['doom', '3페이즈 · 전멸기 (30%)'], ['groggy', '보스 그로기'], ['portal', '포털 열기'],
     ['spawn:shard', '파편체 소환'], ['spawn:eroder', '침식자 소환'], ['spawn:clasher', '파쇄손 소환'],
     ['spawn:guardian', '수호자 소환'],
+    ['reaction', '이안 반작용 +40'], ['party', '파티 편성 화면'],
   ],
 
   // ---------- 진입 / 나가기 ----------
@@ -104,6 +105,10 @@ GL.Master = {
       for (const e of W.enemies) if (!e.dead) e.die(true);
       S.wave = S.WAVES.length; S.waveDelay = 0;
       S.portal = { x: 1550, y: 650, r: 40 }; S.hint = '포털이 열렸다 — F로 진입';
+    } else if (id === 'reaction') {
+      if (!GL.Ian.backflow) { GL.Ian.reaction = Math.min(100, GL.Ian.reaction + 40); GL.Ian.sinceErase = 0; }
+    } else if (id === 'party') {
+      this.panel = false; GL.Main.state = 'party'; return;
     } else if (id.startsWith('spawn:')) {
       const type = id.slice(6), cls = { shard: GL.Shard, eroder: GL.Eroder, clasher: GL.Clasher, guardian: GL.Guardian }[type];
       const f = GL.Render.forward(), p = P.player;

@@ -60,15 +60,18 @@ GL.Combat = {
       this.sparks(e.x, e.y, 4, '#cfe3ff');
       return 0;
     }
-    const groggy = e.groggy > 0;
-    let def = groggy ? 0 : e.def * (1 - GL.World.buffs.defDown - (e.defDownT > 0 ? e.defDown : 0));
+    const groggy = e.groggy > 0, B = GL.World.buffs;
+    let def = (groggy || opts.trueDmg) ? 0 : e.def * (1 - B.defDown - (e.defDownT > 0 ? e.defDown : 0));   // 소거 = 방어 무시 시스템 피해
     def = Math.max(0, def);
     let critRate = R.critRate + (ch.id === 'kay' && weak ? GL.CONFIG.chars.kay.passive.weakCritBonus : 0);
     if (GL.Party.critBuff > 0) critRate += 0.3;
-    const crit = groggy || Math.random() < critRate;
+    const crit = groggy || (ch.id === 'clea' && B.cleaCrit > 0) || Math.random() < critRate;   // 클레아 크리티컬 제련
     let dmg = ch.atk * coef / 100 * 100 / (100 + def) * info.dmgMul;
     if (crit) dmg *= R.critMul;
     if (groggy) dmg *= R.groggyDmgMul;
+    if (opts.mul) dmg *= opts.mul;                                   // 클레아 연마 등
+    if (B.atkUp > 0) dmg *= 1 + GL.CONFIG.chars.clea.assist.atkUp;   // 대장장이의 무구
+    if (ch.id === 'ian') { dmg *= GL.Ian.dmgMul(); if (GL.Ian.backflow) info.fracMul *= 2; }   // 인과 역류
     if (opts.fixed) dmg = opts.fixed;
     dmg = Math.round(dmg * GL.Master.dmgMul());
 
@@ -77,15 +80,25 @@ GL.Combat = {
       e.frac -= frac * info.fracMul;
       if (e.frac <= 0) { e.frac = 0; e.startGroggy(); }
     }
+    if (ch.id === 'ian' && frac > 0) GL.Ian.addMarks(e, frac * info.fracMul);   // 파쇄 흔적
+    // 노아 조력 : 잔영 분신이 같은 공격을 40%로 한 번 더
+    if (B.echo > 0 && !opts.echo && dmg > 0) {
+      const ex = Math.round(dmg * GL.CONFIG.chars.noah.assist.echo);
+      e.hp -= ex; this.text(e.x + 14, e.y - e.r - 20, `잔영 ${ex}`, '#8fe3ff', 12);
+    }
     ch.ult = Math.min(ch.ultMax, ch.ult + (opts.skill ? R.ultPerSkillHit : R.ultPerHit));
     if (!e.boss) {
       if (opts.stun) e.stun = Math.max(e.stun, opts.stun);
       if (opts.knock && opts.dir !== undefined) { e.x += Math.cos(opts.dir) * opts.knock; e.y += Math.sin(opts.dir) * opts.knock; }
+      if (opts.pull) { const d = GL.U.dist(e, opts.pull), k = Math.min(1, opts.pull.amt / Math.max(1, d)); e.x += (opts.pull.x - e.x) * k; e.y += (opts.pull.y - e.y) * k; }
+      if (opts.launch) e.launchT = Math.max(e.launchT || 0, opts.launch);
     }
+    if (opts.slow) e.slowT = Math.max(e.slowT || 0, opts.slow);
+    if (opts.seal) { e.sealT = Math.max(e.sealT || 0, opts.seal); GL.World.tele = GL.World.tele.filter(t => t.owner !== e || e.boss); }
     if (opts.bleed) { e.bleedT = opts.bleed.t; e.bleedDps = opts.bleed.dps; e.bleedCh = ch; }
     if (opts.defDown) { e.defDown = opts.defDown.v; e.defDownT = opts.defDown.t; }
 
-    const col = groggy ? '#ffe066' : (weak ? '#3fe0a8' : (crit ? '#ffd27a' : '#ffffff'));
+    const col = opts.erase ? '#6b9cff' : groggy ? '#ffe066' : (weak ? '#3fe0a8' : (crit ? '#ffd27a' : '#ffffff'));
     this.text(e.x + GL.U.rand(-12, 12), e.y - e.r - 6, (crit ? '★' : '') + dmg, col, crit || groggy ? 20 : 15);
     if (weak && frac > 0) this.sparks(e.x, e.y, 5, '#3fe0a8');
     if (frac >= 6) this.shards(e.x, e.y, 6);
@@ -141,6 +154,8 @@ GL.Combat = {
     if (opts.ground && p.z > 25) return false;                 // 점프 중엔 바닥 공격 회피
     if (p.iframe > 0 && !opts.unavoidable) { this.text(p.x, p.y - 34, '회피', '#cfe3ff', 14); return false; }
     if (W.buffs.barrier > 0 && !opts.unavoidable) { this.text(p.x, p.y - 34, '절대 경계', '#e0b54a', 14); return false; }
+    if (W.buffs.salvation > 0) { this.text(p.x, p.y - 34, '무결 구원', '#f3c6ff', 14); return false; }
+    if (GL.Ian.invincible()) { if (Math.random() < 0.4) this.text(p.x, p.y - 34, '역류', '#888888', 13); return false; }
 
     // 바렌 퍼펙트 가드 : 받은 피해를 반사하고 파쇄 게이지를 깎음
     if (ch.id === 'baren' && p.guard > 0 && !opts.unavoidable) {
@@ -150,6 +165,7 @@ GL.Combat = {
         this.hitEnemy(opts.src, ch, 0, hv.frac * (opts.red ? hv.redMul : 1), { shatter: true, skill: true, parry: true, fixed: Math.round(raw) });
       }
       this.text(p.x, p.y - 40, opts.red ? '퍼펙트 가드! 파쇄 x2' : '퍼펙트 가드!', '#ffe066', 18);
+      GL.Haptics.parry();
       this.ring(p.x, p.y, 70, '#ffe066', 0.35);
       W.shake = Math.max(W.shake, 6);
       return false;
@@ -157,6 +173,7 @@ GL.Combat = {
 
     let dmg = opts.ratio ? ch.maxHp * opts.ratio : atk * coef / 100 * 100 / (100 + ch.def);
     if (W.buffs.fortress > 0) dmg *= 1 - GL.CONFIG.chars.baren.assist.reduce;
+    if (W.buffs.chainWall > 0) dmg *= 1 - GL.CONFIG.chars.taron.assist.reduce;   // 태론 사슬 방벽
     dmg = Math.round(dmg);
     if (W.buffs.shield > 0) {
       const ab = Math.min(W.buffs.shield, dmg);
@@ -168,7 +185,14 @@ GL.Combat = {
       this.hitEnemy(opts.src, ch, 0, 0, { fixed: Math.max(1, Math.round(dmg * GL.CONFIG.chars.baren.passive.reflect)) });
     }
     if (dmg <= 0) return true;
+    // 세레나 조력 : 구명조끼 — 치명상 1회 방지
+    if (W.buffs.vest > 0 && ch.hp - dmg <= 0) {
+      W.buffs.vest = 0; ch.hp = Math.round(ch.maxHp * GL.CONFIG.chars.serena.assist.revive);
+      this.text(p.x, p.y - 50, '구명조끼 발동', '#f3c6ff', 18); this.ring(p.x, p.y, 80, '#f3c6ff', 0.5); GL.Haptics.parry();
+      return true;
+    }
     ch.hp -= dmg;
+    GL.Haptics.hurt(dmg, ch.maxHp);   // 피격 진동
     ch.ult = Math.min(ch.ultMax, ch.ult + this.R().ultPerHurt);
     this.text(p.x, p.y - 30, `-${dmg}`, '#ff5a6e', 17);
     W.shake = Math.max(W.shake, opts.ratio ? 2 : 7);
@@ -187,6 +211,7 @@ GL.Combat = {
     if (W.buffs.fortress > 0) W.buffs.fortress -= dt;
     if (W.buffs.barrier > 0) W.buffs.barrier -= dt;
     if (W.buffs.weakAll > 0) { W.buffs.weakAll -= dt; if (W.buffs.weakAll <= 0) W.buffs.defDown = 0; }
+    for (const k of ['atkUp', 'echo', 'vest', 'cleanse', 'salvation', 'chainWall', 'cleaCrit']) if (W.buffs[k] > 0) W.buffs[k] = Math.max(0, W.buffs[k] - dt);
 
     // 예고 → 발동
     for (const t of W.tele) {
@@ -206,7 +231,8 @@ GL.Combat = {
 
     // 장판
     const p = GL.Party.player;
-    p.slow = 0;
+    p.slow = 0; p.speedUp = 0;
+    if (W.buffs.chainWall > 0) for (const e of W.enemies) if (!e.dead && GL.U.dist(e, p) < GL.CONFIG.chars.taron.assist.radius) e.slowT = Math.max(e.slowT || 0, 0.3);
     for (const f of W.fields) {
       f.life -= dt;
       if (f.kind === 'slow' && GL.U.inCircle(f, f.r, p) && p.z < 20) p.slow = f.slow;
@@ -215,15 +241,41 @@ GL.Combat = {
         if (f.armed === false) { f.arm -= dt; if (f.arm <= 0) f.armed = true; }
         else if (f.tick <= 0 && GL.U.inCircle(f, f.r, p) && p.z < 20) { f.tick = 0.5; this.hurtPlayer(0, 0, { ratio: f.dps * 0.5, ground: true }); }
       }
+      if (f.kind === 'prison') {        // 태론 절제 감옥 : 안의 적은 둔화 + 공격 봉인
+        for (const e of W.enemies) if (!e.dead && GL.U.dist(e, f) < f.r) { e.slowT = Math.max(e.slowT || 0, 0.3); e.sealT = Math.max(e.sealT || 0, 0.3); }
+      }
+      if (f.kind === 'garden') {        // 세레나 빛의 정원 : 안에 있으면 회복 + 이동 속도 증가
+        if (GL.U.dist(p, f) < f.r) { const ch = GL.Party.active(); ch.hp = Math.min(ch.maxHp, ch.hp + ch.maxHp * f.heal * dt); p.speedUp = f.speed; }
+      }
+      if (f.kind === 'spikes') {        // 클레아 유리 가시 지대
+        f.tick -= dt;
+        if (f.tick <= 0) { f.tick = 0.5; this.hitArea({ kind: 'circle', x: f.x, y: f.y, r: f.r }, f.ch, f.coef, 1, {}); }
+      }
       if (f.kind === 'cut') {
         f.tick -= dt;
         if (f.tick <= 0) { f.tick = 0.5; this.hitArea(f.shape, f.ch, f.coef * 0.5, 0, {}); }
       }
     }
     W.fields = W.fields.filter(f => f.life > 0);
+    if (W.buffs.cleanse > 0) p.slow = 0;   // 기억 정화 : 둔화 면역
 
     // 플레이어 투사체
     for (const s of W.pShots) {
+      s.age = (s.age || 0) + dt;
+      if (s.homing) {   // 세레나 유도 탄환
+        let best = null, bd = 320;
+        for (const e of W.enemies) { if (e.dead) continue; const d = GL.U.dist(s, e); if (d < bd) { bd = d; best = e; } }
+        if (best) { const a = Math.atan2(s.vy, s.vx), want = GL.U.angleTo(s, best), sp = Math.hypot(s.vx, s.vy); const na = a + GL.U.clamp(GL.U.angDiff(a, want), -5 * dt, 5 * dt); s.vx = Math.cos(na) * sp; s.vy = Math.sin(na) * sp; }
+      }
+      if (s.curve) { const a = Math.atan2(s.vy, s.vx) + s.curve * dt, sp = Math.hypot(s.vx, s.vy); s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; }
+      if (s.wobble !== undefined) { s.wobble += dt * 14; const a = Math.atan2(s.vy, s.vx); s.x += -Math.sin(a) * Math.cos(s.wobble) * 90 * dt; s.y += Math.cos(a) * Math.cos(s.wobble) * 90 * dt; }
+      if (s.boomerang && !s.returning && s.age >= s.boomerang.turn) { s.returning = true; s.hit = new Set(); }
+      if (s.returning) {   // 노아 차크람 : 돌아오는 궤적도 타격
+        const pp = GL.Party.player, a = GL.U.angleTo(s, pp), sp = Math.hypot(s.vx, s.vy);
+        s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp;
+        if (GL.U.dist(s, pp) < 24) { s.dead = true; continue; }
+      }
+      if (s.multi) { s.multiT = (s.multiT || 0) + dt; if (s.multiT >= s.multi) { s.multiT = 0; s.hit = new Set(); } }
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
       if (s.life <= 0) { s.dead = true; continue; }
       for (const e of W.enemies) {
@@ -231,6 +283,7 @@ GL.Combat = {
         if (GL.U.inCircle(s, s.r, e)) {
           s.hit.add(e);
           this.hitEnemy(e, s.ch, s.coef, s.frac, { ...s.opts, dir: Math.atan2(s.vy, s.vx) });
+          if (s.onHit) s.onHit(e);
           if (!s.pierce) { s.dead = true; break; }
         }
       }
@@ -239,6 +292,7 @@ GL.Combat = {
 
     // 적 투사체
     for (const s of W.eShots) {
+      if (s.frozenT > 0) { s.frozenT -= dt; continue; }   // 태론 시간 정지
       s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
       if (s.life <= 0) { s.dead = true; continue; }
       if (GL.U.inCircle(s, s.r, { x: p.x, y: p.y, r: 14 }) && p.z < 30) {

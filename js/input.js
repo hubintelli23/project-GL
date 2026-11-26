@@ -23,7 +23,7 @@ GL.Input = {
       this.keys[e.code] = false;
       this.onKeyUp(e.code);
     });
-    window.addEventListener('blur', () => { this.keys = {}; this._left = null; this._num = {}; this.mouse.right = false; });
+    window.addEventListener('blur', () => { this.keys = {}; this._left = null; this._num = {}; this._rHold = null; this.mouse.right = false; });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('mousemove', (e) => {
@@ -41,7 +41,7 @@ GL.Input = {
       if (GL.Touch && GL.Touch.enabled) return;   // 휴대폰은 touch.js 가 처리
       if (!this.locked && GL.Main.state === 'play') this.lock();
       if (e.button === 0) {
-        this.push('click');
+        this.push('click', { x: e.clientX, y: e.clientY });
         this.leftDown(this.keys.ControlLeft || this.keys.ControlRight || e.ctrlKey);
       } else if (e.button === 2) {
         this.mouse.right = true; // 우클릭 = 대쉬(누르고 있는 동안)
@@ -77,17 +77,21 @@ GL.Input = {
   onKeyDown(code) {
     const map = {
       Space: 'jump', ShiftLeft: 'dodge', ShiftRight: 'dodge',
-      KeyQ: 'q', KeyE: 'e', KeyR: 'r', Tab: 'observe',
+      KeyQ: 'q', KeyE: 'e', Tab: 'observe',   // R 은 아래에서 짧게/길게 구분
       KeyF: 'interact', KeyM: 'map', Escape: 'pause', Enter: 'confirm',
       Backquote: 'master', KeyH: 'masterPanel',   // 마스터 모드 : ` 진입/나가기, H 패널
+      KeyV: 'vibe',                                // 진동 켜기/끄기
     };
     if (map[code]) this.push(map[code]);
+    // R : 짧게 = 궁극기, 0.5초 길게 = 이안 인과 역류(자의 발동)
+    if (code === 'KeyR') { this._rHold = { t0: performance.now(), fired: false }; return; }
     if (code === 'Digit1' || code === 'Digit2' || code === 'Digit3') {
       this._num[code] = { t: 0, t0: performance.now(), fired: false };
     }
   },
 
   onKeyUp(code) {
+    if (code === 'KeyR' && this._rHold) { if (!this._rHold.fired) this.push('r'); this._rHold = null; return; }
     const n = this._num[code];
     if (n) {
       // 0.5초 전에 떼면 태그
@@ -105,6 +109,7 @@ GL.Input = {
       this._left.t = (now - this._left.t0) / 1000;
       if (this._left.t >= hold) { this._left.heavyFired = true; this.push('heavy'); }
     }
+    if (this._rHold && !this._rHold.fired && (now - this._rHold.t0) / 1000 >= hold) { this._rHold.fired = true; this.push('rHold'); }
     // 숫자키 0.5초 홀딩 = 조력 스킬
     for (const code in this._num) {
       const n = this._num[code];

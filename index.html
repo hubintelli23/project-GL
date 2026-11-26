@@ -5,21 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<!-- Project GL 『이클립스 세븐』 첫 플레이 프로토타입 v0.5 (3인칭 백뷰 3D · PC + 휴대폰) -->
-<title>이클립스 세븐 - 프로토타입 v0.5</title>
+<!-- Project GL 『이클립스 세븐』 첫 플레이 프로토타입 v0.7 (3인칭 백뷰 3D · PC + 휴대폰) -->
+<title>이클립스 세븐 - 프로토타입 v0.7</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <canvas id="gl3d"></canvas>
 <canvas id="game"></canvas>
 
-<!-- 로드 순서가 중요함: 설정 → 공용 도구 → 입력 → 터치 → 전투 → 파티 → 적 → 보스 → 스테이지 → 마스터 모드 → 3D 엔진 → 에셋(무기·캐릭터·몬스터·이펙트·배경) → 렌더 → UI → 메인 -->
+<!-- 로드 순서가 중요함: 설정 → 공용 도구 → 입력 → 터치 → 진동 → 전투 → 파티 → 능력(kits) → 적 → 보스 → 스테이지 → 마스터 모드 → 3D 엔진 → 에셋(무기·캐릭터·몬스터·이펙트·배경) → 렌더 → UI → 파티 편성 → 메인 -->
 <script src="js/config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/input.js"></script>
 <script src="js/touch.js"></script>
+<script src="js/haptics.js"></script>
 <script src="js/combat.js"></script>
 <script src="js/party.js"></script>
+<script src="js/kits.js"></script>
 <script src="js/enemies.js"></script>
 <script src="js/boss.js"></script>
 <script src="js/stage.js"></script>
@@ -33,6 +35,7 @@
 <script src="js/assets/background.js"></script>
 <script src="js/render.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/partyselect.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

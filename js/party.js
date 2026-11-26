@@ -1,10 +1,14 @@
 // ============================================================
-// party.js — 3인 파티 (이안 · 바렌 · 케이), 태그, 조력, 평타/강공격/스킬
+// party.js — 3인 파티 (파티 편성으로 고른 3명), 태그, 조력, 평타/강공격/스킬
+// 이안·바렌·케이의 기술은 여기, 태론·세레나·클레아·노아와 이안의 소거/인과 역류는 kits.js
 // ============================================================
 GL.Party = {
-  init() {
+  init(ids) {
     const C = GL.CONFIG;
-    this.members = C.partyOrder.map(id => {
+    ids = ids || (GL.PartySelect && GL.PartySelect.chosen()) || C.partyOrder;
+    GL.Ian.reset();
+    if (GL.Kits) { GL.Kits.serena.hits = 0; GL.Kits.clea.stacks = 0; GL.Kits.clea.keepT = 0; }
+    this.members = ids.map(id => {
       const c = C.chars[id];
       return {
         id, cfg: c, name: c.name, color: c.color,
@@ -21,7 +25,7 @@ GL.Party = {
       x: 0, y: 0, z: 0, vz: 0, r: 14, facing: 0,
       iframe: 0, dodgeCharges: C.rules.dodgeCharges, dodgeRe: 0,
       lock: 0, guard: 0, dash: null, plunge: null, slow: 0, hurtFlash: 0, buffer: null, moving: false, moveDir: null,
-      anim: { kind: 'idle', t: 0, dur: 1, step: 0 }, walk: 0,
+      anim: { kind: 'idle', t: 0, dur: 1, step: 0 }, walk: 0, eraseWin: 0, speedUp: 0,
     };
   },
 
@@ -45,6 +49,7 @@ GL.Party = {
       case 'q': this.skill('q'); break;
       case 'e': this.skill('e'); break;
       case 'r': this.ultimate(); break;
+      case 'rHold': this.rHold(); break;
       case 'observe': GL.Combat.toggleObserve(); break;
       case 'tag': this.tag(ev.value); break;
       case 'assist': this.assist(ev.value); break;
@@ -70,6 +75,9 @@ GL.Party = {
       if (p.dodgeRe <= 0) p.dodgeCharges = R.dodgeCharges;
     }
     p.lock = Math.max(0, p.lock - dt);
+    p.eraseWin = Math.max(0, p.eraseWin - dt);
+    GL.Ian.update(dt);
+    GL.Kits.clea.update(dt);
     p.anim.t += dt;
     if (p.anim.kind !== 'idle' && p.anim.t > p.anim.dur) p.anim = { kind: 'idle', t: 0, dur: 1, step: 0 };
     if (p.moving) p.walk += dt * (I.mouse.right || (GL.Touch && GL.Touch.joy.sprint) ? 15 : 10);
@@ -93,7 +101,8 @@ GL.Party = {
       const len = Math.hypot(mx, my);
       if (len > 0) {
         const sprint = I.mouse.right || (J && J.active && J.sprint);
-        let sp = R.moveSpeed * (sprint ? R.sprintMul : 1) * (1 - p.slow) * Math.min(1, len);
+        let sp = R.moveSpeed * (sprint ? R.sprintMul : 1) * (1 - p.slow) * Math.min(1, len) * (1 + (p.speedUp || 0));
+        if (this.active().id === 'ian' && GL.Ian.after > 0) sp *= 1 - GL.CONFIG.chars.ian.backflow.after.slow;   // 감각 상실
         p.x += mx / len * sp * dt; p.y += my / len * sp * dt;
         p.moveDir = Math.atan2(my, mx);
         // 캐릭터는 이동 방향으로 부드럽게 돌아섬
@@ -146,6 +155,8 @@ GL.Party = {
   light() {
     const p = this.player, ch = this.active();
     if (p.z > 0.5) return;
+    // 이안 : 4타 '궤적 합체 절단' 이후 추가 입력 = 3단계 소거 연계
+    if (ch.id === 'ian' && p.eraseWin > 0 && p.lock < 0.3 && GL.Ian.tryErase()) return;
     if (p.lock > 0) { if (p.lock < 0.2) p.buffer = 'light'; return; }
     this.aim();
     ch.combo = ch.comboT > 0 ? (ch.combo % 4) + 1 : 1;
@@ -155,6 +166,11 @@ GL.Party = {
     p.lock = step4 ? 0.42 : 0.26;
     this.setAnim('light', p.lock + 0.08, ch.combo);
     const shatter = step4;                     // 마지막 4타 = 파쇄 속성
+    if (GL.Kits[ch.id] && GL.Kits[ch.id].light) { GL.Kits[ch.id].light(ch.combo, ch, p, d); return; }
+    if (ch.id === 'ian' && step4) {           // 소거 연계 입력 대기
+      p.eraseWin = ch.cfg.erasure.window;
+      GL.Party.later(0.05, () => { if (GL.Ian.target() && GL.Ian.after <= 0) GL.Combat.text(p.x, p.y - 70, '공격 : 소거', '#6b9cff', 16); });
+    }
 
     if (d.lunge) { p.x += Math.cos(p.facing) * d.lunge; p.y += Math.sin(p.facing) * d.lunge; }
     if (d.projectile) {
@@ -178,6 +194,7 @@ GL.Party = {
     if (p.z > 0.5 || p.dash) return;
     ch.combo = 0; this.aim();
     this.setAnim(ch.id === 'baren' ? 'guard' : 'heavy', ch.id === 'baren' ? h.guardTime : 0.5);
+    if (GL.Kits[ch.id] && GL.Kits[ch.id].heavy) { GL.Kits[ch.id].heavy(ch, p, h); return; }
     if (ch.id === 'ian') {
       p.lock = 0.45;
       const shape = { kind: 'line', x: p.x, y: p.y, dir: p.facing, len: h.range, w: h.width };
@@ -221,7 +238,7 @@ GL.Party = {
     const d = p.plunge === 'heavy' ? ch.cfg.jumpHeavy : ch.cfg.jump;
     const heavy = p.plunge === 'heavy';
     p.plunge = null; p.lock = 0.25; this.setAnim('land', 0.3);
-    GL.Combat.hitArea({ kind: 'circle', x: p.x, y: p.y, r: d.radius }, ch, d.coef, d.frac, { shatter: heavy, stun: d.stun || 0.3, knock: 25 });
+    GL.Combat.hitArea({ kind: 'circle', x: p.x, y: p.y, r: d.radius }, ch, d.coef, d.frac, { shatter: heavy, stun: d.stun || 0.3, knock: 25, slow: d.slow || ch.cfg.passive?.slow || 0 });
     GL.Combat.ring(p.x, p.y, d.radius, heavy ? '#ffffff' : ch.color, 0.35);
     GL.Combat.shards(p.x, p.y, heavy ? 14 : 6);
     GL.World.shake = heavy ? 8 : 4;
@@ -249,6 +266,7 @@ GL.Party = {
     this.setAnim('skill' + key.toUpperCase(), 0.45);
     const C = GL.Combat, f = p.facing, opt = { shatter: true, skill: true };
     C.text(p.x, p.y - 44, s.name, ch.color, 15);
+    if (GL.Kits[ch.id] && GL.Kits[ch.id][key]) { GL.Kits[ch.id][key](ch, p, s); return; }
 
     if (ch.id === 'ian' && key === 'q') {
       const shape = { kind: 'line', x: p.x, y: p.y, dir: f, len: s.dash + 20, w: 60 };
@@ -294,7 +312,9 @@ GL.Party = {
     if (ch.ult < ch.ultMax) { C.text(p.x, p.y - 36, `궁극기 ${Math.floor(ch.ult)}/${ch.ultMax}`, '#9fb3c8', 13); return; }
     ch.ult = 0; ch.combo = 0; p.guard = 0; this.aim();
     this.setAnim('ult', 0.8);
+    GL.Haptics.ult();
     C.text(p.x, p.y - 56, s.name, '#ffffff', 22);
+    if (GL.Kits[ch.id] && GL.Kits[ch.id].r) { GL.Kits[ch.id].r(ch, p, s); return; }
     if (ch.id === 'ian') {
       p.lock = 0.6; p.iframe = 0.6;
       this.later(0.25, () => {
@@ -317,10 +337,22 @@ GL.Party = {
     }
   },
 
+  // R 길게 : 이안 인과 역류 (자의 발동) — 반작용 불안정 단계부터 / 그 외 캐릭터는 궁극기
+  rHold() {
+    const ch = this.active(), p = this.player, C = GL.Combat, R = GL.CONFIG.chars.ian.reaction;
+    // 임계 상태면 다른 동료로 싸우는 중이어도 R 길게 = 이안을 불러내 자의 발동 (강제 폭주를 피하는 선택)
+    if (ch.id !== 'ian' && !(GL.Ian.member() && GL.Ian.stage() === 'critical' && GL.Ian.after <= 0)) return this.ultimate();
+    if (GL.Ian.backflow) return;
+    if (!GL.Ian.canPlayerActivate()) { C.text(p.x, p.y - 44, `반작용 ${Math.floor(GL.Ian.reaction)}/${R.unstable} — 불안정 단계부터 발동`, '#9fb3c8', 13); return; }
+    this.setAnim('ult', 0.8);
+    GL.Ian.activate('player');
+  },
+
   // ---------- 태그 (숫자키 짧게) ----------
   tag(idx) {
     const p = this.player, C = GL.Combat;
     if (idx === this.activeIdx || !this.members[idx]) return;
+    if (GL.Ian.backflow) { C.text(p.x, p.y - 30, '인과 역류 중 — 교체 불가', '#ff5a6e', 13); return; }
     const m = this.members[idx];
     if (m.hp <= 0) { C.text(p.x, p.y - 30, `${m.name} 전투 불능`, '#9fb3c8', 13); return; }
     if (this.tagCd > 0) return;
@@ -345,14 +377,21 @@ GL.Party = {
     if (m.id === 'ian') { W.buffs.shield = Math.round(this.active().maxHp * a.shieldRatio); W.buffs.shieldT = a.dur; }
     if (m.id === 'baren') W.buffs.fortress = a.dur;
     if (m.id === 'kay') { W.buffs.weakAll = a.dur; W.buffs.defDown = a.defDown; }
+    if (GL.Kits[m.id] && GL.Kits[m.id].assist) GL.Kits[m.id].assist(m);
   },
 
   onActiveDown() {
     const p = this.player;
     GL.Combat.text(p.x, p.y - 50, `${this.active().name} 전투 불능`, '#ff5a6e', 18);
+    GL.Haptics.down();
     const next = this.members.findIndex(m => m.hp > 0);
     if (next < 0) { GL.Main.gameOver(); return; }
     this.activeIdx = next; this.tagCd = 0; p.iframe = 1.0; p.lock = 0; p.guard = 0;
+  },
+
+  healAll(ratio, quiet) {
+    for (const m of this.members) if (m.hp > 0) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * ratio);
+    if (!quiet) GL.Combat.text(this.player.x, this.player.y - 36, '파티 회복', '#f3c6ff', 15);
   },
 
   healActive(ratio) {

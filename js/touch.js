@@ -88,14 +88,14 @@ GL.Touch = {
     if (e.touches.length >= 3) { I.push('master'); return; }
     if (st !== 'play') {   // 타이틀·일시정지·결과 화면·마스터 패널 : 탭 = 진행 / 버튼 누르기
       const t0 = e.changedTouches[0]; I.mouse.x = t0.clientX; I.mouse.y = t0.clientY;
-      I.push('click'); return;
+      I.push('click', { x: t0.clientX, y: t0.clientY }); return;
     }
     this.layout(this.canvas);
     for (const t of e.changedTouches) {
       const x = t.clientX, y = t.clientY;
       if (GL.Master.badgeHit(x, y)) { I.push('masterPanel'); continue; }   // MASTER 표시 탭 = 패널
       const b = this.hitButton(x, y);
-      if (b) { this.btnTouch[t.identifier] = b.id; this.pressed[b.id] = true; this.press(b.id); continue; }
+      if (b) { this.btnTouch[t.identifier] = b.id; this.pressed[b.id] = true; if (b.id === 'r') I.onKeyDown('KeyR'); else this.press(b.id); continue; }
       const pi = this.hitParty(x, y);
       if (pi >= 0) { this.btnTouch[t.identifier] = 'party' + pi; this.pressed['party' + pi] = true; I.onKeyDown('Digit' + (pi + 1)); continue; }
       if (x < this.canvas.width * 0.45 && !this.joy.active) {
@@ -133,6 +133,7 @@ GL.Touch = {
       if (id) {
         delete this.btnTouch[t.identifier]; delete this.pressed[id];
         if (id === 'attack') I.leftUp();
+        if (id === 'r') I.onKeyUp('KeyR');   // 짧게 = 궁극기, 길게 = 인과 역류
         if (id.startsWith('party')) I.onKeyUp('Digit' + (parseInt(id.slice(5), 10) + 1));
       }
       if (this.joy.active && t.identifier === this.joy.id) Object.assign(this.joy, { active: false, id: null, x: 0, y: 0, mag: 0, sprint: false });

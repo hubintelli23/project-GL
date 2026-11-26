@@ -43,7 +43,7 @@ GL.Render = {
   draw() {
     const G = GL.G3, W = GL.World, t = W.time, A = GL.Assets;
     const obs = W.observe.on ? 1 : 0;
-    G.frame.mono = W.mono || 0;
+    G.frame.mono = Math.max(W.mono || 0, GL.Ian.monoLevel());   // 전멸기 · 인과 역류 흑백
     G.begin(this.camera());
     G.resetProgram();
 
@@ -81,6 +81,10 @@ GL.Render = {
       ctx.fillStyle = e.elite ? '#ff9a3d' : '#ff5a6e'; ctx.fillRect(x, y, w * Math.max(0, e.hp / e.maxHp), 4);
       ctx.fillStyle = e.groggy > 0 ? '#ffe066' : '#e8f1ff';
       ctx.fillRect(x, y + 4, w * (e.groggy > 0 ? e.groggy / GL.CONFIG.rules.groggyTime : e.frac / e.fracMax), 3);
+      if (e.marks > 0) {   // 이안 파쇄 흔적 (소거 가능하면 밝게)
+        const ok = e.marks >= GL.CONFIG.chars.ian.erasure.markNeed;
+        ctx.fillStyle = ok ? '#6b9cff' : 'rgba(42,107,255,0.7)'; ctx.fillRect(x, y + 8, w * e.marks / 100, ok ? 3 : 2);
+      }
       if (e.elite) { ctx.fillStyle = '#ffd7a8'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(e.name, s.x, y - 5); }
     }
     ctx.textAlign = 'center';

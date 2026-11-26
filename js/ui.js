@@ -11,6 +11,7 @@ GL.UI = {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (st === 'title') return this.drawTitle(ctx, cv);
     const touch = GL.Touch.enabled;
+    this.drawBackflowBorder(ctx, cv);   // 이안 인과 역류 : 화면 테두리 (자의 발동 / 강제 폭주 구분)
     // 안내 배너는 HUD 아래에 깔리도록 먼저 그림
     if (this.bannerT > 0) {
       this.bannerT -= 1 / 60;
@@ -30,6 +31,7 @@ GL.UI = {
     if (near && !touch) this.pill(ctx, cv.width / 2, cv.height - 170, `[F] ${near}`, '#ffffff');
     if (near && touch) this.pill(ctx, cv.width / 2, cv.height - 40, `F 버튼 : ${near}`, '#ffffff');
     GL.Touch.draw(ctx, cv);
+    this.drawIanGauge(ctx, cv);
     ctx.fillStyle = 'rgba(200,220,255,0.5)'; ctx.font = '11px sans-serif'; ctx.textAlign = touch ? 'left' : 'right';
     if (touch) ctx.fillText(`프로토타입 ${GL.VERSION}`, 12, cv.height - 8);
     else ctx.fillText(`이클립스 세븐 프로토타입 ${GL.VERSION}  ·  Esc 설정/조작법`, cv.width - 12, cv.height - 10);
@@ -39,6 +41,100 @@ GL.UI = {
     if (st === 'pause') this.drawPause(ctx, cv);
     if (st === 'over') this.drawEnd(ctx, cv, '전투 불능', '모든 파티원이 쓰러졌습니다', `${again} : 이 구역 다시 도전`);
     if (st === 'win') this.drawEnd(ctx, cv, '토벌 완료', `시간의 찌꺼기 템푸스 처치  ·  클리어 시간 ${GL.Main.clearTime()}`, `${again} : 처음부터 다시`);
+  },
+
+  reactionColor() { const s = GL.Ian.stage(); return GL.Ian.backflow ? '#ffffff' : s === 'critical' ? '#ff2040' : s === 'unstable' ? '#b06bff' : '#2a6bff'; },
+
+  // ---------- 이안 : 반작용 게이지 · 소거 안내 ----------
+  drawIanGauge(ctx, cv) {
+    const ian = GL.Ian.member();
+    if (!ian) return;
+    const touch = GL.Touch.enabled, I = GL.Ian, R = GL.CONFIG.chars.ian.reaction;
+    const w = touch ? 150 : 300, h = touch ? 6 : 8;
+    const x = touch ? cv.width / 2 - w / 2 : cv.width / 2 - w / 2, y = touch ? cv.height - 18 : cv.height - 108;
+    const stg = I.stage();
+    let label = I.backflow ? `인과 역류 ${I.backflow.mode === 'forced' ? '(강제 폭주)' : '(자의 발동)'} ${Math.max(0, I.backflow.dur - I.backflow.t).toFixed(1)}초`
+      : I.after > 0 ? `감각 상실 ${I.after.toFixed(1)}초 — 소거 봉인`
+      : stg === 'critical' ? `임계! ${Math.max(0, I.graceT).toFixed(1)}초 후 강제 폭주`
+      : stg === 'unstable' ? '불안정 — R 길게 : 인과 역류' : '반작용';
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    ctx.fillStyle = 'rgba(176,107,255,0.25)'; ctx.fillRect(x + w * R.unstable / R.max, y, w * (1 - R.unstable / R.max), h);   // 불안정 구간 표시
+    ctx.fillStyle = this.reactionColor(); ctx.fillRect(x, y, w * Math.min(1, (I.backflow ? 1 - I.backflow.t / I.backflow.dur : I.reaction / R.max)), h);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + w * R.unstable / R.max - 1, y - 2, 2, h + 4);
+    ctx.font = `bold ${touch ? 10 : 12}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillStyle = stg === 'critical' && !I.backflow ? (Math.sin(performance.now() / 80) > 0 ? '#ff2040' : '#ffffff') : '#c9d6ff';
+    ctx.fillText(`이안 ${label}${I.backflow || I.after > 0 ? '' : '  ' + Math.floor(I.reaction)}`, x + w / 2, y - 5);
+    // 4타 직후 : 소거 가능 안내
+    const p = GL.Party.player;
+    if (GL.Party.active().id === 'ian' && p.eraseWin > 0 && I.after <= 0) {
+      const t = I.target();
+      ctx.font = `bold ${touch ? 14 : 18}px sans-serif`;
+      ctx.fillStyle = t ? '#6b9cff' : '#6b7c93';
+      ctx.fillText(t ? `${touch ? '공격' : '좌클릭'} : 소거  (${p.eraseWin.toFixed(1)})` : '소거 불가 — 파쇄 흔적 부족', cv.width / 2, touch ? cv.height * 0.62 : cv.height - 140);
+    }
+    ctx.restore();
+  },
+
+  // ---------- 인과 역류 화면 테두리 : 자의 발동 vs 강제 폭주 ----------
+  drawBackflowBorder(ctx, cv) {
+    const I = GL.Ian, W = cv.width, H = cv.height, t = performance.now() / 1000;
+    const bf = I.backflow, crit = !bf && I.stage() === 'critical' && I.member();
+    if (!bf && !crit) return;
+    ctx.save();
+    const touch = GL.Touch.enabled;
+    if (crit) {   // 임계 도달 : 강제 폭주 예고 (붉은 깜빡임)
+      const a = 0.6 + 0.35 * Math.sin(t * 12), th = Math.min(W, H) * 0.06;
+      const gr = (x0, y0, x1, y1) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, `rgba(255,20,50,${0.35 * a})`); g.addColorStop(1, 'rgba(255,20,50,0)'); return g; };
+      ctx.fillStyle = gr(0, 0, 0, th); ctx.fillRect(0, 0, W, th);
+      ctx.fillStyle = gr(0, H, 0, H - th); ctx.fillRect(0, H - th, W, th);
+      ctx.fillStyle = gr(0, 0, th, 0); ctx.fillRect(0, 0, th, H);
+      ctx.fillStyle = gr(W, 0, W - th, 0); ctx.fillRect(W - th, 0, th, H);
+      ctx.strokeStyle = `rgba(255,32,64,${a})`; ctx.lineWidth = 6; ctx.setLineDash([24, 12]); ctx.strokeRect(5, 5, W - 10, H - 10); ctx.setLineDash([]);
+      const msg = `⚠ 반작용 임계 — ${Math.max(0, I.graceT).toFixed(1)}초 후 강제 폭주  ·  R 길게 = 자의 발동으로 전환`;
+      ctx.font = `bold ${touch ? 12 : 15}px sans-serif`; ctx.textAlign = 'center';
+      const tw = ctx.measureText(msg).width + 24, ty = touch ? 34 : 40;
+      ctx.fillStyle = 'rgba(20,0,4,0.85)'; ctx.fillRect(W / 2 - tw / 2, ty - 18, tw, 26);
+      ctx.fillStyle = `rgba(255,90,110,${0.75 + 0.25 * Math.sin(t * 12)})`; ctx.fillText(msg, W / 2, ty);
+      ctx.restore(); return;
+    }
+    const forced = bf.mode === 'forced', thick = Math.min(W, H) * (forced ? 0.09 : 0.07);
+    // 칠흑 테두리 (안쪽으로 번지는 그림자)
+    const g1 = (x0, y0, x1, y1) => { const g = ctx.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, 'rgba(0,0,0,0.95)'); g.addColorStop(1, 'rgba(0,0,0,0)'); return g; };
+    ctx.fillStyle = g1(0, 0, 0, thick); ctx.fillRect(0, 0, W, thick);
+    ctx.fillStyle = g1(0, H, 0, H - thick); ctx.fillRect(0, H - thick, W, thick);
+    ctx.fillStyle = g1(0, 0, thick, 0); ctx.fillRect(0, 0, thick, H);
+    ctx.fillStyle = g1(W, 0, W - thick, 0); ctx.fillRect(W - thick, 0, thick, H);
+    const left = Math.max(0, bf.dur - bf.t).toFixed(1);
+    ctx.textAlign = 'center';
+    if (!forced) {
+      // 자의 발동 : 고요한 흰 이중선 + 에메랄드 안쪽선, 흔들림 없음
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3; ctx.strokeRect(8, 8, W - 16, H - 16);
+      ctx.strokeStyle = 'rgba(63,224,168,0.6)'; ctx.lineWidth = 1.5; ctx.strokeRect(15, 15, W - 30, H - 30);
+      for (const [cx, cy] of [[8, 8], [W - 8, 8], [8, H - 8], [W - 8, H - 8]]) { ctx.fillStyle = '#ffffff'; ctx.fillRect(cx - 6, cy - 6, 12, 12); }
+      ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(W / 2 - 150, 0, 300, 26);
+      ctx.fillStyle = '#ffffff'; ctx.font = `bold ${touch ? 12 : 14}px sans-serif`;
+      ctx.fillText(`◆ 인과 역류 · 자의 발동  ${left}초`, W / 2, 18);
+    } else {
+      // 강제 폭주 : 붉은 글리치가 테두리를 갉아먹음, 화면 떨림
+      const j = () => (Math.random() - 0.5) * 6;
+      ctx.strokeStyle = 'rgba(255,32,64,0.9)'; ctx.lineWidth = 4; ctx.strokeRect(8 + j(), 8 + j(), W - 16, H - 16);
+      for (let i = 0; i < 26; i++) {
+        const side = i % 4, r = Math.random();
+        const bw = 20 + Math.random() * 90, bh = 3 + Math.random() * 10;
+        let x, y;
+        if (side === 0) { x = r * W; y = Math.random() * thick * 0.8; }
+        else if (side === 1) { x = r * W; y = H - Math.random() * thick * 0.8; }
+        else if (side === 2) { x = Math.random() * thick * 0.8; y = r * H; }
+        else { x = W - Math.random() * thick * 0.8; y = r * H; }
+        ctx.fillStyle = Math.random() < 0.5 ? 'rgba(255,32,64,0.75)' : 'rgba(255,255,255,0.5)';
+        ctx.fillRect(x, y, side < 2 ? bw : bh, side < 2 ? bh : bw);
+      }
+      ctx.fillStyle = 'rgba(40,0,6,0.9)'; ctx.fillRect(W / 2 - 170 + j(), 0, 340, 26);
+      ctx.fillStyle = Math.sin(t * 20) > 0 ? '#ff2040' : '#ffffff'; ctx.font = `bold ${touch ? 12 : 14}px sans-serif`;
+      ctx.fillText(`▲ 강제 폭주 · 제어 불가 — 아군도 공격  ${left}초`, W / 2 + j(), 18);
+    }
+    ctx.restore();
   },
 
   bar(ctx, x, y, w, h, ratio, color, bg = 'rgba(0,0,0,0.55)') {
@@ -68,6 +164,7 @@ GL.UI = {
       ctx.fillStyle = '#e8f1ff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
       ctx.fillText(`${Math.ceil(m.hp)} / ${m.maxHp}`, x0 + 240, y + 20);
       this.bar(ctx, x0 + 10, y + 40, 150, 5, m.ult / m.ultMax, m.ult >= m.ultMax ? '#ffe066' : '#7aa7ff');
+      if (m.id === 'ian') this.bar(ctx, x0 + 10, y + 48, 150, 3, GL.Ian.reaction / 100, this.reactionColor());
       ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
       if (!act && !dead) {
         ctx.fillStyle = m.cd.assist > 0 ? '#6b7c93' : '#ffe066';
@@ -97,6 +194,7 @@ GL.UI = {
       ctx.textAlign = 'right'; ctx.fillStyle = '#e8f1ff'; ctx.fillText(`${Math.ceil(m.hp)}`, x0 + w - 6, y + 15);
       this.bar(ctx, x0 + 8, y + 21, w - 16, 6, m.hp / m.maxHp, dead ? '#444' : '#3fe0a8');
       this.bar(ctx, x0 + 8, y + 30, (w - 16) * 0.6, 3, m.ult / m.ultMax, m.ult >= m.ultMax ? '#ffe066' : '#7aa7ff');
+      if (m.id === 'ian') this.bar(ctx, x0 + 8, y + 34, (w - 16) * 0.6, 2, GL.Ian.reaction / 100, this.reactionColor());
     });
     this.partyBottom = y0 + 3 * (h + gap);
   },
@@ -165,6 +263,7 @@ GL.UI = {
       this.bar(ctx, x, y + 26, w, 8, b.frac / b.fracMax, '#e8f1ff');
       ctx.fillStyle = '#c9d6e6'; ctx.font = '11px sans-serif'; ctx.fillText(`파쇄 게이지 ${Math.ceil(b.frac)} / ${b.fracMax}`, cv.width / 2, y + 48);
     }
+    if (b.marks > 0) { ctx.fillStyle = '#6b9cff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'right'; ctx.fillText(`파쇄 흔적 ${Math.floor(b.marks)}${b.marks >= GL.CONFIG.chars.ian.erasure.markNeed ? ' · 소거 가능' : ''}`, x + w, y + 48); ctx.textAlign = 'center'; }
     if (b.mode === 'recover') { ctx.fillStyle = '#3fe0a8'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('약점 노출 — 시간의 핵 (관측)', cv.width / 2, y + 66); }
     if (b.mode === 'reversal' || b.mode === 'doom') {
       const left = b.mode === 'reversal' ? b.castT : b.doomT;
@@ -234,19 +333,21 @@ GL.UI = {
       ['왼쪽 엄지', '조이스틱 이동 · 원 밖까지 밀면 대쉬'], ['오른쪽 화면 드래그', '카메라 회전'],
       ['공격 탭 / 0.5초 누르기', '평타 1~4타 / 강공격 (바렌 = 퍼펙트 가드)'],
       ['점프 · 공중 공격 · 공중 점프', '점프 / 점프 공격 / 점프 강공격(낙하)'],
-      ['회피 · Q · E · R', '회피 / 스킬 1·2 / 궁극기'], ['관측', '약점·매듭·투사체 궤적 보기 (8초)'],
+      ['회피 · Q · E · R', '회피 / 스킬 1·2 / 궁극기 (R 길게 = 이안 인과 역류)'], ['관측', '약점·매듭·투사체 궤적 보기 (8초)'],
+      ['이안 4타 직후 공격', '소거 연계 (파쇄 흔적이 쌓인 적)'],
       ['파티 카드 탭 / 길게', '태그 / 대기 파티원 조력 스킬'], ['F · 지도 · Ⅱ', '상호작용 / 지도 / 일시정지'],
-      ['세 손가락 탭', '마스터(테스트) 모드 진입·나가기'],
+      ['세 손가락 탭', '마스터(테스트) 모드 진입·나가기'], ['일시정지 화면', '진동 켜기/끄기 (오른쪽 위 버튼)'],
     ];
     return [
       ['마우스 이동', '카메라 회전 (3인칭 백뷰) · 공격은 앞쪽 가까운 적에게 자동 조준'],
       ['WASD', '카메라 기준 이동'], ['Space', '점프'], ['Shift', '회피 (0.3초 무적, 2회)'], ['우클릭 (누르고 있기)', '대쉬 (이동 속도 1.8배)'],
       ['좌클릭', '평타 1~4타 (4타 = 파쇄 속성)'], ['좌클릭 0.5초 홀딩', '강공격 (파쇄 속성) · 바렌 = 퍼펙트 가드'],
       ['공중 좌클릭', '점프 공격'], ['공중 Ctrl + 좌클릭', '점프 강공격 (파쇄 속성)'],
-      ['Q / E', '스킬 1 / 2'], ['R', '궁극기 (게이지 가득)'], ['Tab', '관측 : 약점 코어·매듭·투사체 궤적 보기 (8초)'],
+      ['Q / E', '스킬 1 / 2'], ['R / R 0.5초 길게', '궁극기 / (이안) 인과 역류 — 반작용 불안정부터'],
+      ['4타 직후 좌클릭', '(이안) 소거 연계 — 파쇄 흔적이 쌓인 적'], ['Tab', '관측 : 약점 코어·매듭·투사체 궤적 보기 (8초)'],
       ['1 · 2 · 3 짧게', '파티원 태그'], ['1 · 2 · 3 0.5초 홀딩', '대기 파티원 조력 스킬'],
       ['F', '상호작용 (회복 데이터, 포털)'], ['M', '지도'], ['Esc', '일시정지 / 조작법'],
-      ['` / H', '마스터(테스트) 모드 진입·나가기 / 패널'],
+      ['` / H', '마스터(테스트) 모드 진입·나가기 / 패널'], ['V', '휴대폰 진동 켜기/끄기'],
     ];
   },
 
@@ -269,9 +370,9 @@ GL.UI = {
     ctx.fillStyle = '#7aa7ff'; ctx.font = `bold ${11 * k}px sans-serif`; ctx.fillText('3D 액션 JRPG  ·  3인칭 백뷰', cv.width / 2, 84 * k);
     const y = this.drawControls(ctx, cv.width / 2 - 20, 112 * k, 12 * k, 22 * k);
     ctx.textAlign = 'center'; ctx.fillStyle = '#c9d6e6'; ctx.font = `${11 * k}px sans-serif`;
-    ctx.fillText('파티 : 이안(파쇄) · 바렌(수호/패링) · 케이(극딜)  —  필드 3웨이브 → 인과 보스 템푸스', cv.width / 2, y + 4 * k);
+    ctx.fillText('7대선 7명 중 이안 + 동료 2명으로 파티 편성  —  필드 3웨이브 → 인과 보스 템푸스', cv.width / 2, y + 4 * k);
     ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ffffff' : '#7aa7ff'; ctx.font = `bold ${16 * k}px sans-serif`;
-    ctx.fillText('화면을 탭해서 시작', cv.width / 2, Math.min(H - 14, y + 30 * k));
+    ctx.fillText('화면을 탭해서 파티 편성으로', cv.width / 2, Math.min(H - 14, y + 30 * k));
   },
 
   drawTitle(ctx, cv) {
@@ -290,7 +391,7 @@ GL.UI = {
     ctx.fillStyle = '#c9d6e6'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('파티 : 1 이안(파쇄)  ·  2 바렌(수호/패링)  ·  3 케이(극딜)   —   필드 3웨이브 → 인과 보스 템푸스', cv.width / 2, y + 14);
     ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ffffff' : '#7aa7ff'; ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('클릭해서 시작 (마우스가 화면에 고정됩니다 · Esc로 해제)', cv.width / 2, y + 54);
+    ctx.fillText('클릭해서 파티 편성으로 (게임 중 마우스가 화면에 고정 · Esc로 해제)', cv.width / 2, y + 54);
   },
 
   drawPause(ctx, cv) {
@@ -302,6 +403,21 @@ GL.UI = {
     else this.drawControls(ctx, cv.width / 2, 130);
     ctx.textAlign = 'center'; ctx.fillStyle = '#7aa7ff'; ctx.font = 'bold 16px sans-serif';
     ctx.fillText(touch ? '화면을 탭하면 계속합니다' : '클릭 또는 Esc : 계속하기', cv.width / 2, cv.height - (touch ? 18 : 40));
+    // 진동 켜기/끄기 버튼
+    const H = GL.Haptics, label = !H.supported ? '진동 : 이 기기는 지원 안 함' : `진동 : ${H.enabled ? '켜짐' : '꺼짐'}${touch ? '  (탭해서 바꾸기)' : '  (V 키 / 클릭)'}`;
+    ctx.font = 'bold 14px sans-serif';
+    const bw = ctx.measureText(label).width + 36, bh = 32, bx = cv.width - bw - 16, by = 14;
+    this.vibeBtn = { x: bx, y: by, w: bw, h: bh };
+    ctx.fillStyle = H.enabled && H.supported ? 'rgba(63,224,168,0.25)' : 'rgba(80,80,90,0.5)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = H.enabled && H.supported ? '#3fe0a8' : '#6b7c93'; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.fillText(label, bx + bw / 2, by + 21);
+    // 파티 다시 편성 (처음부터)
+    ctx.font = 'bold 14px sans-serif';
+    const pl = '파티 다시 편성 (처음부터)', pw = ctx.measureText(pl).width + 36, ph = 32, px = cv.width - pw - 16, py = 54;
+    this.partyBtn = { x: px, y: py, w: pw, h: ph };
+    ctx.fillStyle = 'rgba(122,167,255,0.22)'; ctx.fillRect(px, py, pw, ph);
+    ctx.strokeStyle = '#7aa7ff'; ctx.lineWidth = 2; ctx.strokeRect(px, py, pw, ph);
+    ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.fillText(pl, px + pw / 2, py + 21);
   },
 
   drawEnd(ctx, cv, title, sub, action) {

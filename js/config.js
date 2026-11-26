@@ -4,7 +4,7 @@
 // ============================================================
 window.GL = window.GL || {};
 
-GL.VERSION = 'v0.5';
+GL.VERSION = 'v0.7';
 
 GL.CONFIG = {
   // ---- 공통 규칙 ----
@@ -36,7 +36,7 @@ GL.CONFIG = {
   // ---- 캐릭터 ----
   chars: {
     ian: {
-      name: '이안', role: '파쇄 딜러', color: '#3fe0a8', weapon: '가변형 재봉 가위',
+      name: '이안', role: '파쇄 딜러', virtue: '겸손', color: '#3fe0a8', weapon: '가변형 재봉 가위',
       hp: 1000, atk: 100, def: 50, ultMax: 100,
       light: [ // 평타 1~4타 : 계수(%), 파쇄, 사거리, 각도(도)
         { name: '사선 절단', coef: 50, frac: 1, range: 75, arc: 110 },
@@ -50,11 +50,31 @@ GL.CONFIG = {
       passive: { name: '오류 정정', weakFracBonus: 0.5 },
       q: { name: '궤적 절삭', coef: 200, frac: 12, cd: 8, dash: 170, stun: 0.5 },
       e: { name: '관찰자의 혜안', cd: 15, dur: 3, radius: 320, weakDmgBonus: 0.3 },
-      r: { name: '해체', coef: 600, frac: 30, radius: 260 },
+      r: { name: '인과해체', coef: 600, frac: 30, radius: 260 },   // 2단계 파쇄 중심 광역 궁극기 (소거와 통합하지 않음)
       assist: { name: '유리 파편', dur: 5, shieldRatio: 0.15 },
+      // ---- 3단계 소거 연계 / 4단계 인과 역류 (문서상 미정 수치 → 임시값) ----
+      erasure: {
+        name: '소거', window: 0.7,         // 4타 '궤적 합체 절단' 이후 추가 입력 유효 시간(초)
+        markMax: 100, markNeed: 40,          // 파쇄 흔적 최대 / 소거 가능 조건
+        markPerFrac: 4,                      // 이안의 파쇄 수치 1당 쌓이는 흔적
+        coef: 260, radius: 150,              // 소거 피해(방어 무시 시스템 피해), 잔재·장판 삭제 반경
+        reaction: 18,                        // 소거 1회당 반작용 누적
+      },
+      reaction: {
+        max: 100, unstable: 60,              // 불안정 단계 = 플레이어 선택 발동 가능
+        grace: 3,                            // 임계(100) 도달 후 강제 발동까지 유예(초)
+        decay: 1.5, decayDelay: 6,           // 소거를 안 하면 6초 뒤부터 초당 1.5 감소
+      },
+      backflow: {
+        name: '인과 역류',
+        player: { dur: 8, hpCost: 0.10, drain: 0.015, dmgMul: 2.2 },          // 자의 발동
+        forced: { dur: 10, hpCost: 0, drain: 0.03, dmgMul: 2.6, allyHit: 0.03 }, // 강제 폭주 (아군도 공격)
+        pulseEvery: 1.2, pulseCoef: 70, pulseR: 170,
+        after: { dur: 8, slow: 0.3 },        // 후유증 : 감각 상실 (이동 감소, 소거 봉인)
+      },
     },
     baren: {
-      name: '바렌', role: '수호 · 패링', color: '#e0b54a', weapon: '타워 쉴드',
+      name: '바렌', role: '수호 · 패링', virtue: '인내', color: '#e0b54a', weapon: '타워 쉴드',
       hp: 1400, atk: 70, def: 90, ultMax: 100,
       light: [
         { name: '방패 치기', coef: 40, frac: 2, range: 65, arc: 120 },
@@ -72,7 +92,7 @@ GL.CONFIG = {
       assist: { name: '수호자의 요새', dur: 8, reduce: 0.5 },
     },
     kay: {
-      name: '케이', role: '극딜 · 약점 해독', color: '#b48cff', weapon: '단검(스틸레토)',
+      name: '케이', role: '극딜 · 약점 해독', virtue: '순결', color: '#b48cff', weapon: '단검(스틸레토)',
       hp: 850, atk: 115, def: 40, ultMax: 120,
       light: [
         { name: '코드:천공', coef: 35, frac: 1, range: 70, arc: 50, lunge: 25 },
@@ -89,7 +109,82 @@ GL.CONFIG = {
       r: { name: '코드 파쇄 : 오버라이브', coef: 700, frac: 20, hits: 7, radius: 200 },
       assist: { name: '약점 해독', dur: 8, defDown: 0.3 },
     },
+    // ---------- v0.7 추가 7대선 ----------
+    taron: {
+      name: '태론', role: '제어 · 결계', virtue: '절제', color: '#7fc8e8', weapon: '삼절곤',
+      hp: 1200, atk: 85, def: 70, ultMax: 110,
+      light: [
+        { name: '구속 타격', coef: 45, frac: 2, range: 95, arc: 90, stun: 0.4 },
+        { name: '진공 청소', coef: 40, frac: 2, range: 140, arc: 100, pull: 60 },
+        { name: '디지털 에어본', coef: 60, frac: 3, range: 80, arc: 110, stun: 0.9, launch: true },
+        { name: '체인 슬랩', coef: 100, frac: 8, line: true, len: 160, w: 50, stun: 1.0 },
+      ],
+      heavy: { name: '억제 결계', coef: 120, frac: 12, radius: 130, seal: 4 },
+      jump: { coef: 80, frac: 4, radius: 90, stun: 1.0 },
+      jumpHeavy: { coef: 130, frac: 10, radius: 120, stun: 1.4 },
+      passive: { name: '노이즈 쿨다운', cdCut: 1.5, slow: 2 },
+      q: { name: '진공 포박', coef: 140, frac: 12, cd: 9, len: 320 },
+      e: { name: '절제 감옥', coef: 0, frac: 0, cd: 14, radius: 120, dur: 6 },
+      r: { name: '절대 쇄인 : 시간 정지', radius: 340, dur: 4, bossDur: 2.5 },
+      assist: { name: '절제의 사슬 방벽', dur: 8, reduce: 0.25, radius: 120 },
+    },
+    serena: {
+      name: '세레나', role: '치유 · 정화', virtue: '자애', color: '#e9b8ff', weapon: '향로 메이스',
+      hp: 1050, atk: 80, def: 55, ultMax: 120,
+      light: [
+        { name: '지애의 유도 탄환', coef: 45, frac: 1, homing: true },
+        { name: '은총', coef: 40, frac: 2, range: 90, arc: 140, knock: 40 },
+        { name: '초승달 밀치기', coef: 55, frac: 3, range: 115, arc: 220, knock: 50 },
+        { name: '백색 파동', coef: 90, frac: 6, radius: 130, heal: 0.03 },
+      ],
+      heavy: { name: '광휘 파동', coef: 160, frac: 8, len: 300, w: 90 },
+      jump: { coef: 70, frac: 3, radius: 130, slow: 3 },
+      jumpHeavy: { coef: 110, frac: 6, radius: 150, slow: 4 },
+      passive: { name: '기억의 잔재', every: 5, heal: 0.02 },
+      q: { name: '빛의 정원', cd: 14, radius: 150, dur: 6, heal: 0.03, speed: 0.2 },
+      e: { name: '기억 정화', cd: 12, heal: 0.10, immune: 5 },
+      r: { name: '자애의 빛 : 무결 구원', dur: 4, coef: 400, frac: 20, radius: 260 },
+      assist: { name: '구명조끼', dur: 20, revive: 0.3 },
+    },
+    clea: {
+      name: '클레아', role: '파괴 · 무기 강화', virtue: '근면', color: '#ff9f5a', weapon: '메카닉 워해머',
+      hp: 1150, atk: 110, def: 60, ultMax: 120,
+      light: [
+        { name: '모루 횡단', coef: 55, frac: 3, range: 95, arc: 160 },
+        { name: '제련', coef: 60, frac: 4, range: 85, arc: 100, stun: 0.6, launch: true },
+        { name: '중력 해머', coef: 80, frac: 5, circleFront: 60, radius: 80, stun: 0.5 },
+        { name: '피스톤 가시', coef: 110, frac: 8, circleFront: 60, radius: 110, after: 50 },
+      ],
+      heavy: { name: '역 중력', coef: 170, frac: 14, radius: 140, stun: 1.2 },
+      jump: { coef: 100, frac: 5, radius: 140 },
+      jumpHeavy: { coef: 160, frac: 12, radius: 170 },
+      passive: { name: '연마', perHit: 0.02, max: 10, keep: 3 },
+      q: { name: '유리 가시', cd: 10, radius: 120, dur: 5, coef: 30 },
+      e: { name: '크리티컬 제련', cd: 16, dur: 6 },
+      r: { name: '제련의 인과 : 창조의 모루', coef: 650, frac: 35, radius: 200, delay: 0.6 },
+      assist: { name: '대장장이의 무구', dur: 10, atkUp: 0.25 },
+    },
+    noah: {
+      name: '노아', role: '원거리 · 환영', virtue: '소망', color: '#8fe3ff', weapon: '차크람',
+      hp: 900, atk: 105, def: 45, ultMax: 110,
+      light: [
+        { name: '차크람 투척', coef: 45, frac: 2, boomerang: true, range: 260 },
+        { name: '궤적 투척', coef: 45, frac: 2, curve: true, range: 240 },
+        { name: '교차 궤적', coef: 30, frac: 2, cross: true, range: 220 },
+        { name: '파편 폭풍', coef: 35, frac: 3, storm: true, radius: 130, hits: 3, knock: 50 },
+      ],
+      heavy: { name: '렌즈 광선', coef: 190, frac: 12, len: 420, w: 40 },
+      jump: { coef: 70, frac: 3, radius: 120, stun: 1.2 },
+      jumpHeavy: { coef: 110, frac: 7, radius: 140, stun: 1.5 },
+      passive: { name: '소망의 관측', rangeUp: 0.2 },
+      q: { name: '희망의 파동', cd: 8, coef: 120, frac: 10, radius: 150, knock: 90 },
+      e: { name: '잔영 투척', cd: 10, coef: 60, frac: 4, count: 3 },
+      r: { name: '희망의 만화경', coef: 80, frac: 4, beams: 14, radius: 360 },
+      assist: { name: '소망의 잔영', dur: 8, echo: 0.4 },
+    },
   },
+  // 파티 편성 : 이안(주인공·리더, 관측 담당)은 고정, 나머지 6명 중 2명 선택
+  roster: ['ian', 'taron', 'serena', 'baren', 'kay', 'clea', 'noah'],
   partyOrder: ['ian', 'baren', 'kay'],
 
   // ---- 적 ----

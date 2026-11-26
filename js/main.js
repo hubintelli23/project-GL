@@ -32,6 +32,8 @@ GL.Main = {
     // 다른 앱으로 나갔다 오면 일시정지
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.state === 'play') this.state = 'pause'; });
     GL.Input.init(cv);
+    GL.Haptics.init();
+    GL.PartySelect.init();
     GL.Input.isAirborne = () => GL.Party.isAirborne();
     GL.World.reset();
     GL.Party.init();
@@ -39,8 +41,8 @@ GL.Main = {
     requestAnimationFrame((t) => this.loop(t));
   },
 
-  newGame() {
-    GL.Party.init();
+  newGame(ids) {
+    GL.Party.init(ids || GL.PartySelect.chosen());
     GL.Stage.start('field');
     this.state = 'play';
     this.startTime = GL.World.time; this.elapsed = 0;
@@ -50,12 +52,13 @@ GL.Main = {
     const name = GL.Stage.name;
     for (const m of GL.Party.members) { m.hp = m.maxHp; m.cd = { q: 0, e: 0, assist: 0 }; }
     GL.Party.activeIdx = 0;
+    GL.Ian.reset();
     GL.Stage.start(name);
     this.state = 'play';
   },
 
-  gameOver() { if (this.state === 'play') { this.state = 'over'; GL.Input.unlock(); } },
-  win() { this.state = 'win'; GL.Input.unlock(); },
+  gameOver() { if (this.state === 'play') { this.state = 'over'; GL.Input.unlock(); GL.Haptics.gameOver(); } },
+  win() { this.state = 'win'; GL.Input.unlock(); GL.Haptics.win(); },
   clearTime() { const s = Math.floor(this.elapsed || 0); return `${Math.floor(s / 60)}분 ${s % 60}초`; },
 
   loop(now) {
@@ -71,6 +74,7 @@ GL.Main = {
     }
     // 휴대폰 세로 화면이면 가로로 돌리라는 안내만 표시 (게임은 멈춤)
     if (GL.Touch.enabled && this.cv.height > this.cv.width) { GL.Touch.drawRotate(GL.Render.ctx, this.cv); if (this.state === 'play') this.state = 'pause'; requestAnimationFrame((t) => this.loop(t)); return; }   // v0.4 : 세로 화면에서 루프가 멈추던 버그 수정
+    if (this.state === 'party') { GL.PartySelect.draw(GL.Render.ctx, this.cv); requestAnimationFrame((t) => this.loop(t)); return; }   // 파티 편성 화면
     if (this.state !== 'title') GL.Render.draw();
     GL.UI.draw(GL.Render.ctx, this.cv);
     requestAnimationFrame((t) => this.loop(t));
@@ -83,18 +87,33 @@ GL.Main = {
 
     // 화면 상태별 공통 입력
     for (const ev of events) {
+      if (ev.type === 'click' && ev.value) { I.mouse.x = ev.value.x; I.mouse.y = ev.value.y; }   // 같은 프레임 연속 클릭도 각자 좌표로
       // 마스터 모드 (테스트)
       if (ev.type === 'master') { GL.Master.toggle(); continue; }
       if (ev.type === 'masterPanel') { GL.Master.togglePanel(); continue; }
       if (this.state === 'master') { if (ev.type === 'click') GL.Master.click(I.mouse.x, I.mouse.y); if (ev.type === 'pause') GL.Master.closePanel(); continue; }
-      if (this.state === 'title' && (ev.type === 'confirm' || ev.type === 'click')) { this.newGame(); return; }
+      if (this.state === 'title' && (ev.type === 'confirm' || ev.type === 'click')) { this.state = 'party'; return; }   // 타이틀 → 파티 편성
+      if (this.state === 'party') {
+        if (ev.type === 'click') GL.PartySelect.click(I.mouse.x, I.mouse.y);
+        else if (ev.type === 'confirm') GL.PartySelect.start();
+        else if (ev.type === 'pause') this.state = 'title';
+        if (this.state !== 'party') return;
+        continue;
+      }
       if (this.state === 'over' && (ev.type === 'confirm' || ev.type === 'click')) { this.retryStage(); return; }
       if (this.state === 'win' && (ev.type === 'confirm' || ev.type === 'click')) { this.newGame(); return; }
       if (ev.type === 'pause' && (this.state === 'play' || this.state === 'pause')) {
         if (this.state === 'play') { this.state = 'pause'; I.unlock(); } else { this.state = 'play'; }
         return;
       }
-      if (this.state === 'pause' && ev.type === 'click') { this.state = 'play'; return; }
+      if (ev.type === 'vibe') { const on = GL.Haptics.toggle(); GL.UI.banner(on ? '진동 켜짐' : '진동 꺼짐'); continue; }
+      if (this.state === 'pause' && ev.type === 'click') {
+        const b = GL.UI.vibeBtn, x = I.mouse.x, y = I.mouse.y;
+        if (b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { GL.Haptics.toggle(); continue; }
+        const pb = GL.UI.partyBtn;   // 파티 다시 편성 (처음부터)
+        if (pb && x >= pb.x && x <= pb.x + pb.w && y >= pb.y && y <= pb.y + pb.h) { this.state = 'party'; return; }
+        this.state = 'play'; return;
+      }
       if (ev.type === 'map' && this.state === 'play') GL.UI.mapOpen = !GL.UI.mapOpen;
     }
     GL.Master.update(dt);
@@ -113,6 +132,7 @@ GL.Main = {
     if (!GL.Master.frozen()) for (const e of GL.World.enemies) if (!e.dead) e.update(dt);
     this.separate();
     GL.Combat.update(dt);
+    GL.Haptics.watchShake(GL.World.shake);   // 화면 흔들림 → 진동
     GL.Stage.update(dt);
     GL.World.enemies = GL.World.enemies.filter(e => !e.dead);
   },
