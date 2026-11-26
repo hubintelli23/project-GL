@@ -373,6 +373,8 @@ GL.UI = {
     ctx.fillText('7대선 7명 중 이안 + 동료 2명으로 파티 편성  —  필드 3웨이브 → 인과 보스 템푸스', cv.width / 2, y + 4 * k);
     ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ffffff' : '#7aa7ff'; ctx.font = `bold ${16 * k}px sans-serif`;
     ctx.fillText('화면을 탭해서 파티 편성으로', cv.width / 2, Math.min(H - 14, y + 30 * k));
+    ctx.fillStyle = 'rgba(255,90,120,0.9)'; ctx.font = `bold ${10 * k}px sans-serif`; ctx.textAlign = 'right';
+    ctx.fillText('세 손가락 탭 = 마스터 모드 (7대죄 플레이 해금)', cv.width - 10, H - 8);
   },
 
   drawTitle(ctx, cv) {
@@ -392,6 +394,8 @@ GL.UI = {
     ctx.fillText('파티 : 1 이안(파쇄)  ·  2 바렌(수호/패링)  ·  3 케이(극딜)   —   필드 3웨이브 → 인과 보스 템푸스', cv.width / 2, y + 14);
     ctx.fillStyle = Math.sin(t * 4) > 0 ? '#ffffff' : '#7aa7ff'; ctx.font = 'bold 20px sans-serif';
     ctx.fillText('클릭해서 파티 편성으로 (게임 중 마우스가 화면에 고정 · Esc로 해제)', cv.width / 2, y + 54);
+    ctx.fillStyle = 'rgba(255,90,120,0.9)'; ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('`  키 (숫자 1 왼쪽) = 마스터 모드  —  7대죄 플레이 해금 · 이안 고정 해제', cv.width / 2, y + 84);
   },
 
   drawPause(ctx, cv) {
@@ -404,13 +408,29 @@ GL.UI = {
     ctx.textAlign = 'center'; ctx.fillStyle = '#7aa7ff'; ctx.font = 'bold 16px sans-serif';
     ctx.fillText(touch ? '화면을 탭하면 계속합니다' : '클릭 또는 Esc : 계속하기', cv.width / 2, cv.height - (touch ? 18 : 40));
     // 진동 켜기/끄기 버튼
-    const H = GL.Haptics, label = !H.supported ? '진동 : 이 기기는 지원 안 함' : `진동 : ${H.enabled ? '켜짐' : '꺼짐'}${touch ? '  (탭해서 바꾸기)' : '  (V 키 / 클릭)'}`;
+    const H = GL.Haptics, usable = H.usable();
+    const label = !usable ? '진동 : 이 기기는 지원 안 함' : `진동${H.ios && !H.supported ? '(iOS 햅틱)' : ''} : ${H.enabled ? '켜짐' : '꺼짐'}${touch ? '  (탭해서 바꾸기)' : '  (V 키 / 클릭)'}`;
     ctx.font = 'bold 14px sans-serif';
     const bw = ctx.measureText(label).width + 36, bh = 32, bx = cv.width - bw - 16, by = 14;
     this.vibeBtn = { x: bx, y: by, w: bw, h: bh };
-    ctx.fillStyle = H.enabled && H.supported ? 'rgba(63,224,168,0.25)' : 'rgba(80,80,90,0.5)'; ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = H.enabled && H.supported ? '#3fe0a8' : '#6b7c93'; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = H.enabled && usable ? 'rgba(63,224,168,0.25)' : 'rgba(80,80,90,0.5)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = H.enabled && usable ? '#3fe0a8' : '#6b7c93'; ctx.lineWidth = 2; ctx.strokeRect(bx, by, bw, bh);
     ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.fillText(label, bx + bw / 2, by + 21);
+    // 진동 테스트 : 안 울릴 때 이유 표시
+    {
+      ctx.font = 'bold 14px sans-serif';
+      const tl = '진동 테스트', tw = ctx.measureText(tl).width + 36, tx = bx - tw - 8;
+      this.vibeTestBtn = { x: tx, y: by, w: tw, h: bh };
+      ctx.fillStyle = 'rgba(30,40,60,0.9)'; ctx.fillRect(tx, by, tw, bh);
+      ctx.strokeStyle = '#7aa7ff'; ctx.lineWidth = 2; ctx.strokeRect(tx, by, tw, bh);
+      ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.fillText(tl, tx + tw / 2, by + 21);
+      if (H.lastResult) {
+        ctx.font = `bold ${touch ? 11 : 13}px sans-serif`; ctx.textAlign = 'right';
+        const rw = ctx.measureText(H.lastResult).width + 20;
+        ctx.fillStyle = 'rgba(5,7,13,0.9)'; ctx.fillRect(cv.width - rw - 16, by + 76, rw, 24);
+        ctx.fillStyle = '#ffe066'; ctx.fillText(H.lastResult, cv.width - 26, by + 93);
+      }
+    }
     // 파티 다시 편성 (처음부터)
     ctx.font = 'bold 14px sans-serif';
     const pl = '파티 다시 편성 (처음부터)', pw = ctx.measureText(pl).width + 36, ph = 32, px = cv.width - pw - 16, py = 54;

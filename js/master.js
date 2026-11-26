@@ -30,6 +30,15 @@ GL.Master = {
   // ---------- 진입 / 나가기 ----------
   toggle() {
     const M = GL.Main;
+    // 타이틀 · 파티 편성 화면 : 마스터 모드 = 7대죄 플레이 해금 (패널 없이 파티 편성으로)
+    if (M.state === 'title' || M.state === 'party') {
+      this.active = !this.active; this.panel = false;
+      if (!this.active) { this.speed = 1; for (const k in this.opt) this.opt[k] = k === 'info'; }
+      GL.PartySelect.onMaster(this.active);
+      M.state = 'party';
+      GL.UI.banner(this.active ? '마스터 모드 — 7대죄 플레이 해금 · 14명 중 자유롭게 3명' : '마스터 모드 종료 — 7대선 편성으로 돌아감');
+      return;
+    }
     if (!['play', 'pause', 'master'].includes(M.state)) return;
     if (!this.active) {
       this.active = true; this.openPanel();

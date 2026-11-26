@@ -19,6 +19,7 @@ GL.World = {
   },
 };
 
+const ef_freeze = (f) => f.effect && f.effect.freezeShots;
 GL.Combat = {
   R: () => GL.CONFIG.rules,
 
@@ -72,6 +73,10 @@ GL.Combat = {
     if (opts.mul) dmg *= opts.mul;                                   // 클레아 연마 등
     if (B.atkUp > 0) dmg *= 1 + GL.CONFIG.chars.clea.assist.atkUp;   // 대장장이의 무구
     if (ch.id === 'ian') { dmg *= GL.Ian.dmgMul(); if (GL.Ian.backflow) info.fracMul *= 2; }   // 인과 역류
+    const SK = GL.Kits && GL.Kits[ch.id];
+    if (SK && SK.dmgMul) dmg *= SK.dmgMul(ch, e);                    // 7대죄 패시브 (탐욕·분노·질투)
+    if (B.berserk > 0) dmg *= 1 + GL.CONFIG.chars.ares.assist.atkUp;   // 아레스 조력 : 광란의 버서커
+    if (e.isolateT > 0) dmg *= 1 + (e.isolateMul || 0);               // 백토르 격리 큐브 : 받는 피해 증가
     if (opts.fixed) dmg = opts.fixed;
     dmg = Math.round(dmg * GL.Master.dmgMul());
 
@@ -86,6 +91,11 @@ GL.Combat = {
       const ex = Math.round(dmg * GL.CONFIG.chars.noah.assist.echo);
       e.hp -= ex; this.text(e.x + 14, e.y - e.r - 20, `잔영 ${ex}`, '#8fe3ff', 12);
     }
+    if (B.cubeCut > 0 && !opts.echo && dmg > 0) {                   // 백토르 조력 : 절단 연산 추가 피해
+      const ex = Math.max(1, Math.round(dmg * GL.CONFIG.chars.baektor.assist.extra)); e.hp -= ex; this.text(e.x - 14, e.y - e.r - 20, `절단 ${ex}`, '#e8e8ff', 12);
+    }
+    if (B.lifesteal > 0 && dmg > 0) { const a = GL.Party.active(); a.hp = Math.min(a.maxHp, a.hp + dmg * GL.CONFIG.chars.ploto.assist.steal); }   // 플로토 조력 : 라이프 스틸
+    if (SK && SK.onHit && dmg > 0) SK.onHit(e, dmg, opts, ch);
     ch.ult = Math.min(ch.ultMax, ch.ult + (opts.skill ? R.ultPerSkillHit : R.ultPerHit));
     if (!e.boss) {
       if (opts.stun) e.stun = Math.max(e.stun, opts.stun);
@@ -155,6 +165,7 @@ GL.Combat = {
     if (p.iframe > 0 && !opts.unavoidable) { this.text(p.x, p.y - 34, '회피', '#cfe3ff', 14); return false; }
     if (W.buffs.barrier > 0 && !opts.unavoidable) { this.text(p.x, p.y - 34, '절대 경계', '#e0b54a', 14); return false; }
     if (W.buffs.salvation > 0) { this.text(p.x, p.y - 34, '무결 구원', '#f3c6ff', 14); return false; }
+    if (W.buffs.mirror > 0 && !opts.unavoidable && Math.random() < GL.CONFIG.chars.invidi.assist.miss) { this.text(p.x, p.y - 34, '교란', '#5ad18c', 14); return false; }   // 인바디 조력
     if (GL.Ian.invincible()) { if (Math.random() < 0.4) this.text(p.x, p.y - 34, '역류', '#888888', 13); return false; }
 
     // 바렌 퍼펙트 가드 : 받은 피해를 반사하고 파쇄 게이지를 깎음
@@ -172,6 +183,9 @@ GL.Combat = {
     }
 
     let dmg = opts.ratio ? ch.maxHp * opts.ratio : atk * coef / 100 * 100 / (100 + ch.def);
+    if (ch.id === 'ares') dmg *= 1 - GL.Kits.ares.reduce(ch);                  // 핏빛 분노 · 폭주 강화
+    if (W.buffs.berserk > 0) dmg *= 1 + GL.CONFIG.chars.ares.assist.defDown;   // 광란의 버서커 : 방어력 감소
+    if (GL.Kits[ch.id] && GL.Kits[ch.id].onHurt) GL.Kits[ch.id].onHurt(ch);
     if (W.buffs.fortress > 0) dmg *= 1 - GL.CONFIG.chars.baren.assist.reduce;
     if (W.buffs.chainWall > 0) dmg *= 1 - GL.CONFIG.chars.taron.assist.reduce;   // 태론 사슬 방벽
     dmg = Math.round(dmg);
@@ -211,7 +225,7 @@ GL.Combat = {
     if (W.buffs.fortress > 0) W.buffs.fortress -= dt;
     if (W.buffs.barrier > 0) W.buffs.barrier -= dt;
     if (W.buffs.weakAll > 0) { W.buffs.weakAll -= dt; if (W.buffs.weakAll <= 0) W.buffs.defDown = 0; }
-    for (const k of ['atkUp', 'echo', 'vest', 'cleanse', 'salvation', 'chainWall', 'cleaCrit']) if (W.buffs[k] > 0) W.buffs[k] = Math.max(0, W.buffs[k] - dt);
+    for (const k of ['atkUp', 'echo', 'vest', 'cleanse', 'salvation', 'chainWall', 'cleaCrit', 'cubeCut', 'lifesteal', 'aresRage', 'berserk', 'mirror', 'taint', 'worldStop']) if (W.buffs[k] > 0) W.buffs[k] = Math.max(0, W.buffs[k] - dt);
 
     // 예고 → 발동
     for (const t of W.tele) {
@@ -250,6 +264,20 @@ GL.Combat = {
       if (f.kind === 'spikes') {        // 클레아 유리 가시 지대
         f.tick -= dt;
         if (f.tick <= 0) { f.tick = 0.5; this.hitArea({ kind: 'circle', x: f.x, y: f.y, r: f.r }, f.ch, f.coef, 1, {}); }
+      }
+      if (f.kind === 'zone' && f.effect) {   // 7대죄 범용 장판 (매혹 가스 · 환각 연기 · 시간 지연 · 중력 지대)
+        f.tick -= dt;
+        if (f.tick <= 0) {
+          f.tick = f.every || 0.5; const ef = f.effect;
+          for (const e of W.enemies) {
+            if (e.dead || GL.U.dist(e, f) > f.r) continue;
+            if (ef.slow) e.slowT = Math.max(e.slowT || 0, ef.slow);
+            if (ef.seal) e.sealT = Math.max(e.sealT || 0, ef.seal);
+            if (ef.defDown) { e.defDown = Math.max(e.defDown || 0, ef.defDown.v); e.defDownT = Math.max(e.defDownT || 0, 1); }
+          }
+          if (f.coef > 0 && f.ch) this.hitArea({ kind: 'circle', x: f.x, y: f.y, r: f.r }, f.ch, f.coef, 0, {});
+        }
+        if (ef_freeze(f)) for (const s of W.eShots) if (GL.U.dist(s, f) < f.r) s.frozenT = Math.max(s.frozenT || 0, 0.1);
       }
       if (f.kind === 'cut') {
         f.tick -= dt;

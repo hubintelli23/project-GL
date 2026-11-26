@@ -86,7 +86,9 @@ GL.Main = {
     const events = I.consume();
 
     // 화면 상태별 공통 입력
-    for (const ev of events) {
+    // 세 손가락 탭은 손가락이 몇 ms 차이로 닿아 같은 프레임에 탭이 섞여 들어옴 → 마스터 전환만 처리
+    const evs = events.some(e => e.type === 'master') ? events.filter(e => e.type !== 'click') : events;
+    for (const ev of evs) {
       if (ev.type === 'click' && ev.value) { I.mouse.x = ev.value.x; I.mouse.y = ev.value.y; }   // 같은 프레임 연속 클릭도 각자 좌표로
       // 마스터 모드 (테스트)
       if (ev.type === 'master') { GL.Master.toggle(); continue; }
@@ -110,6 +112,8 @@ GL.Main = {
       if (this.state === 'pause' && ev.type === 'click') {
         const b = GL.UI.vibeBtn, x = I.mouse.x, y = I.mouse.y;
         if (b && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) { GL.Haptics.toggle(); continue; }
+        const vt = GL.UI.vibeTestBtn;   // 진동 테스트
+        if (vt && x >= vt.x && x <= vt.x + vt.w && y >= vt.y && y <= vt.y + vt.h) { GL.Haptics.test(); continue; }
         const pb = GL.UI.partyBtn;   // 파티 다시 편성 (처음부터)
         if (pb && x >= pb.x && x <= pb.x + pb.w && y >= pb.y && y <= pb.y + pb.h) { this.state = 'party'; return; }
         this.state = 'play'; return;

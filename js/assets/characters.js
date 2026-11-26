@@ -51,6 +51,49 @@ GL.Assets.Characters = {
       coat: '#1e3a4a', coatTrim: '#8fe3ff', shirt: '#e8f8ff', pants: '#1a2c38', boots: '#0e1a22',
       scarf: '#8fe3ff', coatLength: 'cape', weapon: 'noah', dual: true, eye: '#8fe3ff',
     },
+    // ----- 7대죄 (마스터 모드 전용 플레이) -----
+    baektor: {
+      scale: 1.04, shoulder: 9, build: 0.95,
+      skin: '#f4e6dc', hair: '#f2f2f8', hairStyle: 'short',
+      coat: '#f0f0f6', coatTrim: '#c9a640', shirt: '#2a2a34', pants: '#e2e2ea', boots: '#1a1a22',
+      coatLength: 'long', weapon: 'baektor', eye: '#ffd24a', sin: true,
+    },
+    ploto: {
+      scale: 1.02, shoulder: 9.5, build: 1.05,
+      skin: '#e8cfc0', hair: '#5a0e1a', hairStyle: 'spiky',
+      coat: '#2a0c12', coatTrim: '#d2304a', shirt: '#4a1420', pants: '#1c0a0e', boots: '#0e0406',
+      scarf: '#d2304a', coatLength: 'long', weapon: 'ploto', eye: '#ff3050', sin: true,
+    },
+    ares: {
+      scale: 1.16, shoulder: 11.5, build: 1.3,
+      skin: '#d8a890', hair: '#b82010', hairStyle: 'spiky',
+      coat: '#3a1208', coatTrim: '#ff4a2a', shirt: '#1e0a06', pants: '#24100a', boots: '#100604',
+      armor: '#5a2a1a', coatLength: 'short', weapon: 'ares', eye: '#ff6a2a', sin: true,
+    },
+    invidi: {
+      scale: 0.98, shoulder: 8.5, build: 0.9,
+      skin: '#cfe0d4', hair: '#0e2a1a', hairStyle: 'hood',
+      coat: '#0e2a1a', coatTrim: '#5ad18c', shirt: '#163a26', pants: '#0a1a10', boots: '#050c08',
+      scarf: '#5ad18c', coatLength: 'cape', weapon: 'invidi', eye: '#7affb0', sin: true,
+    },
+    asadi: {
+      scale: 0.96, shoulder: 8, build: 0.86,
+      skin: '#f2d6e0', hair: '#7a2aa8', hairStyle: 'long',
+      coat: '#3a1250', coatTrim: '#e6a6ff', shirt: '#5a2278', pants: '#2a0c3a', boots: '#14061c',
+      coatLength: 'robe', weapon: 'asadi', eye: '#ff7ae0', sin: true,
+    },
+    luciel: {
+      scale: 1.0, shoulder: 9, build: 0.95,
+      skin: '#e8e2dc', hair: '#8a929e', hairStyle: 'bob',
+      coat: '#4a4e58', coatTrim: '#c8d0dc', shirt: '#2a2e36', pants: '#30343c', boots: '#16181c',
+      scarf: '#6a7280', coatLength: 'long', weapon: 'luciel', eye: '#c8d0dc', sin: true,
+    },
+    gula: {
+      scale: 1.2, shoulder: 12, build: 1.5,
+      skin: '#d8b48c', hair: '#3a2a10', hairStyle: 'short',
+      coat: '#4a3414', coatTrim: '#d8a040', shirt: '#2a1e0a', pants: '#2a200c', boots: '#120c04',
+      armor: '#6a5020', coatLength: 'short', weapon: 'gula', dual: true, backMaw: true, eye: '#ffd040', sin: true,
+    },
   },
   // 이안 인과 역류 중 외형 : 칠흑 (자의 발동 = 흰 눈 / 강제 폭주 = 붉은 눈)
   backflowLook(def, mode) {
@@ -205,6 +248,12 @@ GL.Assets.Characters = {
       G.draw('box', G.chain(Mt, G.T(-4, torso, 2), G.Rz(-0.9 - sw), G.T(0, -5, 0), G.S(1, 10, 2.6)), C(def.scarf), 0.25, this.cloth);
     }
 
+    if (def.backMaw) {   // 굴라 : 등에 달린 생체 아가리
+      const open = 0.3 + P.glow * 0.5, Mm = G.chain(Mt, G.T(-8 * b, torso * 0.6, 0), G.Rz(Math.PI / 2 + 0.3));
+      G.draw('cone2', G.chain(Mm, G.Rz(open), G.S(6, 12, 9)), C('#7a2a2a'), 0, this.skinM);
+      G.draw('cone2', G.chain(Mm, G.Rz(-open), G.S(6, 12, 9)), C('#7a2a2a'), 0, this.skinM);
+      for (let i = 0; i < 5; i++) G.draw('cone2', G.chain(Mm, G.T(4, (i - 2) * 1.6, 0), G.Rz(-Math.PI / 2), G.S(0.8, 2.6, 0.8)), C('#f4ecd8'), 0.1);
+    }
     // --- 팔 ---
     const hands = {};
     for (const [side, z] of [['L', -sh * b], ['R', sh * b]]) {

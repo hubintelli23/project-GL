@@ -29,6 +29,9 @@ GL.Assets.Effects = {
       }
       else if (s.wave) G.draw('ball', G.chain(G.root(s.x, 22, s.y, a), G.S(10, 16, s.r)), this.c('#ffffff', 0.85), 1);   // 세레나 광휘 파동
       else if (s.orb) { G.draw('ball', G.chain(G.T(s.x, 32, s.y), G.S(6, 6, 6)), this.c('#ffffff'), 1); G.draw('thinRing', G.chain(G.T(s.x, 32, s.y), G.Rx(t * 6), G.S(10, 10, 10)), this.c(s.color), 1); }
+      else if (s.saw) { const M = G.chain(G.T(s.x, 24, s.y), G.Ry(t * 22)); G.draw('ring', G.chain(M, G.S(s.r, s.r, s.r)), this.c(s.color), 0.7, { spec: 0.9, shine: 40 }); for (let i = 0; i < 10; i++) G.draw('cone2', G.chain(M, G.Ry(i * 0.628), G.T(s.r, 0, 0), G.Rz(-Math.PI / 2), G.S(2, 7, 2)), this.c('#ffd0d8'), 0.6); }
+      else if (s.needle) G.draw('tube', G.chain(G.root(s.x, 28, s.y, a), G.Rz(-Math.PI / 2), G.S(0.9, 14, 0.9)), this.c(s.color), 1);
+      else if (s.slime) G.draw('ball', G.chain(G.T(s.x, 24, s.y), G.S(s.r, s.r * 0.7, s.r)), this.c(s.color, 0.85), 0.5);
       else G.draw('ball', G.chain(G.T(s.x, 30, s.y), G.S(s.r, s.r, s.r)), this.c(s.color || '#ffffff'), 1);
     }
     // 유리 파편 / 불꽃
@@ -48,7 +51,42 @@ GL.Assets.Effects = {
         G.draw('box', G.chain(G.T(f.x, h + 6, f.y), G.S(40, 10, 36)), this.c('#ff9f5a'), 0.6);
       }
     }
+    // 7대죄 이펙트 (입체)
+    for (const f of W.fx) {
+      const k = f.t / f.life;
+      if (f.kind === 'cube') {            // 백토르 격리 큐브 : 모서리만 빛나는 디지털 상자
+        if (f.follow && !f.follow.dead) { f.x = f.follow.x; f.y = f.follow.y; }
+        const z = f.size, col = this.c(f.color || '#e8e8ff', 0.9 * (1 - k * 0.5));
+        for (const [x, y, zz, sx, sy, sz] of [[0, 0, -z, z * 2, 1.6, 1.6], [0, 0, z, z * 2, 1.6, 1.6], [-z, 0, 0, 1.6, 1.6, z * 2], [z, 0, 0, 1.6, 1.6, z * 2],
+          [0, z * 2, -z, z * 2, 1.6, 1.6], [0, z * 2, z, z * 2, 1.6, 1.6], [-z, z * 2, 0, 1.6, 1.6, z * 2], [z, z * 2, 0, 1.6, 1.6, z * 2],
+          [-z, z, -z, 1.6, z * 2, 1.6], [z, z, -z, 1.6, z * 2, 1.6], [-z, z, z, 1.6, z * 2, 1.6], [z, z, z, 1.6, z * 2, 1.6]])
+          G.draw('box', G.chain(G.T(f.x + x, y + 2, f.y + zz), G.S(sx, sy, sz)), col, 1);
+        G.draw('box', G.chain(G.T(f.x, z, f.y), G.S(z * 2, z * 2, z * 2)), this.c(f.color || '#e8e8ff', 0.08), 0.6);
+      } else if (f.kind === 'bigsword') { // 백토르 궁극기 : 단죄의 검 수직 강하
+        const d = Math.min(1, f.t / f.drop), h = 520 * (1 - d * d) + 10;
+        G.draw('box', G.chain(G.T(f.x, h + 160, f.y), G.S(12, 300, 44)), this.c('#f4f4ff'), 0.4, { spec: 0.9, shine: 50 });
+        G.draw('box', G.chain(G.T(f.x, h + 320, f.y), G.S(16, 10, 110)), this.c('#c9a640'), 0.4, { spec: 0.9, shine: 50 });
+        G.draw('cone2', G.chain(G.T(f.x, h + 10, f.y), G.Rz(Math.PI), G.S(6, 40, 22)), this.c('#ffffff'), 0.7);
+      } else if (f.kind === 'greedOrb') { // 플로토 탐욕의 구체
+        G.draw('ball', G.chain(G.T(f.x, 60, f.y), G.S(f.r, f.r, f.r)), this.c('#3a0610', 0.85), 0.2);
+        for (let i = 0; i < 3; i++) G.draw('ring', G.chain(G.T(f.x, 60, f.y), G.Rx(t * (2 + i) + i), G.Ry(i), G.S(f.r * 1.2, f.r * 1.2, f.r * 1.2)), this.c('#d2304a'), 0.8);
+      } else if (f.kind === 'shadow') {   // 인바디 그림자 출몰
+        G.draw('cone2', G.chain(G.T(f.x, 0, f.y), G.S(18 * (1 - k) + 4, 50 * (1 - k), 18 * (1 - k) + 4)), this.c('#0a1a10', 0.8 * (1 - k)), 0.2);
+      } else if (f.kind === 'clones') {   // 인바디 분신 무도회
+        const pp = GL.Party.player;
+        for (let i = 0; i < f.n; i++) { const a = t * 4 + i * 6.283 / f.n; GL.Assets.Characters.humanoid(G, GL.Assets.Characters.defs.invidi, GL.Assets.Characters.pose({ anim: { kind: 'light', t: (t * 3 + i) % 0.3, dur: 0.3, step: 1 + i % 4 } }, {}, t), pp.x + Math.cos(a) * f.r, 0, pp.y + Math.sin(a) * f.r, a + Math.PI, { alpha: 0.45 * (1 - k * 0.5), t }); }
+      } else if (f.kind === 'maw') {      // 굴라 아가리
+        const op = Math.sin(Math.min(1, k * 1.6) * Math.PI) * 0.9, sc = f.s;
+        const M = G.root(f.x, 26 * sc, f.y, f.dir);
+        G.draw('cone2', G.chain(M, G.Rz(-Math.PI / 2 + op), G.S(14 * sc, 30 * sc, 20 * sc)), this.c('#7a2a2a', 1 - k * 0.4), 0.1);
+        G.draw('cone2', G.chain(M, G.Rz(-Math.PI / 2 - op), G.S(14 * sc, 30 * sc, 20 * sc)), this.c('#7a2a2a', 1 - k * 0.4), 0.1);
+        for (let i = 0; i < 6; i++) G.draw('cone2', G.chain(M, G.T(20 * sc, 0, (i - 2.5) * 5 * sc), G.Rz(op), G.S(1.5 * sc, 6 * sc, 1.5 * sc)), this.c('#f4ecd8'), 0.2);
+      } else if (f.kind === 'vortex') {   // 굴라 블랙홀
+        for (let i = 0; i < 4; i++) G.draw('thinRing', G.chain(G.T(f.x, 10 + i * 6, f.y), G.Ry(t * 6 + i), G.S(f.r * (1 - k) * (0.4 + i * 0.15), 6, f.r * (1 - k) * (0.4 + i * 0.15))), this.c('#d8a040', 0.6), 0.6);
+      }
+    }
     for (const f of W.fields) {
+      if (f.kind === 'zone' && f.thorns) for (let i = 0; i < 14; i++) { const a = i * 2.4, r = (i % 5 + 1) / 5 * f.r * 0.85; G.draw('cone2', G.chain(G.T(f.x + Math.cos(a) * r, 0, f.y + Math.sin(a) * r), G.Rx(Math.sin(i) * 0.3), G.S(2.4, 22 + (i % 3) * 8, 2.4)), this.c('#8a3ac2'), 0.35); }
       if (f.kind === 'prison') for (let i = 0; i < 10; i++) { const a = i * 0.628 + t * 0.4; G.draw('tube', G.chain(G.T(f.x + Math.cos(a) * f.r, 0, f.y + Math.sin(a) * f.r), G.S(2, 60, 2)), this.c('#bfe8ff', 0.9), 0.8); }
       if (f.kind === 'spikes') for (let i = 0; i < 12; i++) { const a = i * 2.4, r = (i % 4 + 1) / 4 * f.r * 0.85; G.draw('octa', G.chain(G.T(f.x + Math.cos(a) * r, 10, f.y + Math.sin(a) * r), G.Ry(a), G.S(4, 16 + (i % 3) * 6, 4)), [0.85, 0.95, 1, 0.85], 0.4, this.glass); }
     }
@@ -130,6 +168,11 @@ GL.Assets.Effects = {
       } else if (f.kind === 'timestop') {
         G.decal(G.ringStrip(f.x, f.y, f.r - 4, f.r), 0.9, [0.75, 0.9, 1, 0.8]);
         for (let i = 0; i < 12; i++) G.decal(G.rect(f.x + Math.cos(i * 0.5236) * (f.r - 22), f.y + Math.sin(i * 0.5236) * (f.r - 22), i * 0.5236, 16, 3), 0.95, [0.75, 0.9, 1, 0.7]);
+      } else if (f.kind === 'zone') {   // 7대죄 범용 장판
+        const c = this.c(f.color || '#ffffff');
+        G.decal(G.circle(f.x, f.y, f.r), 0.8, [c[0], c[1], c[2], 0.18]);
+        G.decal(G.ringStrip(f.x, f.y, f.r - 3, f.r), 0.9, [c[0], c[1], c[2], 0.8]);
+        if (f.clock) { for (let i = 0; i < 12; i++) G.decal(G.rect(f.x + Math.cos(i * 0.5236) * (f.r - 12), f.y + Math.sin(i * 0.5236) * (f.r - 12), i * 0.5236, 8, 2), 0.95, [c[0], c[1], c[2], 0.7]); G.decal(G.rect(f.x, f.y, t * 0.4, f.r * 0.8, 3), 0.95, [c[0], c[1], c[2], 0.8]); }
       } else if (f.kind === 'cut') {
         const s = f.shape;
         G.decal(G.rect(s.x, s.y, s.dir, s.len, s.w), 0.8, [0.8, 1, 0.95, 0.12 + 0.05 * Math.sin(t * 20)]);
@@ -201,6 +244,9 @@ GL.Assets.Effects = {
       } else if (f.kind === 'kaleido') { // 노아 만화경 렌즈 배열
         const pp = GL.Party.player;
         for (let i = 0; i < 6; i++) { const a = t * 1.5 + i * 1.047; G.draw('ring', G.chain(G.T(pp.x + Math.cos(a) * 90, 200, pp.y + Math.sin(a) * 90), G.Rx(0.6), G.S(22, 22, 22)), [0.78, 0.96, 1, 1 - k * 0.6], 1); }
+      } else if (f.kind === 'clockface') {   // 루시엘 지연
+        for (let i = 0; i < 12; i++) G.decal(G.rect(f.x + Math.cos(i * 0.5236) * f.r * 0.9, f.y + Math.sin(i * 0.5236) * f.r * 0.9, i * 0.5236, 18, 4), 1.5, [0.8, 0.85, 0.9, 1 - k]);
+        G.decal(G.rect(f.x, f.y, -k * 6, f.r * 0.8, 5), 1.6, [1, 1, 1, 1 - k]);
       } else if (f.kind === 'spark') {
         const a = Math.atan2(f.vy, f.vx);
         G.draw('box', G.chain(G.root(f.x, 28, f.y, a), G.S(10 * (1 - k) + 2, 1.6, 1.6)), [c[0], c[1], c[2], 1 - k], 1);

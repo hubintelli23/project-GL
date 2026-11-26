@@ -7,7 +7,7 @@ GL.Party = {
     const C = GL.CONFIG;
     ids = ids || (GL.PartySelect && GL.PartySelect.chosen()) || C.partyOrder;
     GL.Ian.reset();
-    if (GL.Kits) { GL.Kits.serena.hits = 0; GL.Kits.clea.stacks = 0; GL.Kits.clea.keepT = 0; }
+    if (GL.Kits) { GL.Kits.serena.hits = 0; GL.Kits.clea.stacks = 0; GL.Kits.clea.keepT = 0; if (GL.Kits.resetSins) GL.Kits.resetSins(); }
     this.members = ids.map(id => {
       const c = C.chars[id];
       return {
@@ -78,6 +78,7 @@ GL.Party = {
     p.eraseWin = Math.max(0, p.eraseWin - dt);
     GL.Ian.update(dt);
     GL.Kits.clea.update(dt);
+    if (GL.Kits.tickSins) GL.Kits.tickSins(dt);
     p.anim.t += dt;
     if (p.anim.kind !== 'idle' && p.anim.t > p.anim.dur) p.anim = { kind: 'idle', t: 0, dur: 1, step: 0 };
     if (p.moving) p.walk += dt * (I.mouse.right || (GL.Touch && GL.Touch.joy.sprint) ? 15 : 10);
@@ -101,7 +102,7 @@ GL.Party = {
       const len = Math.hypot(mx, my);
       if (len > 0) {
         const sprint = I.mouse.right || (J && J.active && J.sprint);
-        let sp = R.moveSpeed * (sprint ? R.sprintMul : 1) * (1 - p.slow) * Math.min(1, len) * (1 + (p.speedUp || 0));
+        let sp = R.moveSpeed * (sprint ? R.sprintMul : 1) * (1 - p.slow) * Math.min(1, len) * (1 + (p.speedUp || 0) + (GL.Kits.moveBonus ? GL.Kits.moveBonus() : 0));
         if (this.active().id === 'ian' && GL.Ian.after > 0) sp *= 1 - GL.CONFIG.chars.ian.backflow.after.slow;   // 감각 상실
         p.x += mx / len * sp * dt; p.y += my / len * sp * dt;
         p.moveDir = Math.atan2(my, mx);
@@ -240,6 +241,7 @@ GL.Party = {
     p.plunge = null; p.lock = 0.25; this.setAnim('land', 0.3);
     GL.Combat.hitArea({ kind: 'circle', x: p.x, y: p.y, r: d.radius }, ch, d.coef, d.frac, { shatter: heavy, stun: d.stun || 0.3, knock: 25, slow: d.slow || ch.cfg.passive?.slow || 0 });
     GL.Combat.ring(p.x, p.y, d.radius, heavy ? '#ffffff' : ch.color, 0.35);
+    if (GL.Kits[ch.id] && GL.Kits[ch.id].land) GL.Kits[ch.id].land(ch, p, heavy, d);
     GL.Combat.shards(p.x, p.y, heavy ? 14 : 6);
     GL.World.shake = heavy ? 8 : 4;
   },

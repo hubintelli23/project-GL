@@ -17,6 +17,13 @@ GL.Assets.Weapons = {
     serena: { shaft: '#e8dcf5', head: '#c9b0e6', chain: '#d8c8ee', lantern: '#fff2c8', glow: '#f3c6ff' },
     clea:   { shaft: '#4a3a30', head: '#7a6a5a', trim: '#ff9f5a', piston: '#c8c0b8' },
     noah:   { ring: '#d8f4ff', edge: '#8fe3ff', grip: '#1e3a4a' },
+    baektor: { steel: '#f4f4ff', guard: '#c9a640', grip: '#2a2a34' },
+    ploto:   { chain: '#8a8a94', saw: '#d2304a', grip: '#2a0c12' },
+    ares:    { steel: '#5a5a60', edge: '#ff4a2a', grip: '#2a1008' },
+    invidi:  { shaft: '#1a2a20', blade: '#cfe0d4', edge: '#5ad18c' },
+    asadi:   { whip: '#5a2278', thorn: '#e6a6ff', grip: '#2a0c3a' },
+    luciel:  { shaft: '#6a7280', face: '#e8e2dc', rim: '#c8d0dc', hand: '#2a2e36' },
+    gula:    { claw: '#d8d0c0', knuckle: '#6a5020' },
     guardianShield: { plate: '#5c7fc0', rim: '#c9dcff', core: '#9fc4ff' },
     guardianMace:   { shaft: '#7a8796', head: '#aab6c4', spike: '#e6eef8' },
   },
@@ -114,6 +121,72 @@ GL.Assets.Weapons = {
     G.draw('ring', G.chain(Mr, G.S(9, 9, 9)), this.c(s.ring), 0.2, this.metal);
     for (let i = 0; i < 4; i++) G.draw('blade', G.chain(Mr, G.Ry(i * 1.5708), G.T(7, 0, 0), G.Rx(Math.PI / 2), G.S(6, 18, 24)), this.c(s.edge), 0.5 + g * 0.4, this.metal);
     G.draw('box', G.chain(M, G.S(4, 2, 2)), this.c(s.grip), 0);
+  },
+
+  // ========== 7대죄 무기 ==========
+  // 백토르 : 레이피어
+  baektor(G, M, opt = {}) {
+    const s = this.style.baektor, g = opt.glow || 0;
+    G.draw('tube', G.chain(M, G.T(-6, 0, 0), G.Rz(-Math.PI / 2), G.S(1.2, 8, 1.2)), this.c(s.grip), 0);
+    G.draw('thinRing', G.chain(M, G.T(1, 0, 0), G.Ry(Math.PI / 2), G.S(4.5, 4.5, 4.5)), this.c(s.guard), 0.3, this.metal);
+    G.draw('tube', G.chain(M, G.T(2, 0, 0), G.Rz(-Math.PI / 2), G.S(0.7, 44, 0.7)), this.c(s.steel), 0.2 + g * 0.6, this.metal);
+    G.draw('cone2', G.chain(M, G.T(46, 0, 0), G.Rz(-Math.PI / 2), G.S(0.7, 4, 0.7)), this.c('#ffffff'), 0.6 + g * 0.4);
+  },
+  // 플로토 : 사슬 톱날 채찍 (끝에 회전 톱날)
+  ploto(G, M, opt = {}) {
+    const s = this.style.ploto, t = opt.t || 0, g = opt.glow || 0;
+    G.draw('tube', G.chain(M, G.T(-6, 0, 0), G.Rz(-Math.PI / 2), G.S(1.6, 10, 1.6)), this.c(s.grip), 0);
+    let m = G.chain(M, G.T(4, 0, 0));
+    for (let i = 0; i < 8; i++) { G.draw('thinRing', G.chain(m, G.Ry(i * 1.57), G.Rx(Math.PI / 2), G.S(1.8, 1.8, 1.8)), this.c(s.chain), 0.1, this.metal); m = G.chain(m, G.T(3.4, 0, 0), G.Rz(-0.12 - g * 0.15 + Math.sin(t * 6 + i) * 0.08)); }
+    const Ms = G.chain(m, G.T(4, 0, 0), G.Rx(Math.PI / 2), G.Ry(t * 20));
+    G.draw('ring', G.chain(Ms, G.S(6, 6, 6)), this.c(s.saw), 0.4 + g * 0.5, this.metal);
+    for (let i = 0; i < 8; i++) G.draw('cone2', G.chain(Ms, G.Ry(i * 0.785), G.T(6, 0, 0), G.Rz(-Math.PI / 2), G.S(1, 3, 1)), this.c('#ffffff'), 0.3, this.metal);
+  },
+  // 아레스 : 양손 대검
+  ares(G, M, opt = {}) {
+    const s = this.style.ares, g = opt.glow || 0;
+    G.draw('tube', G.chain(M, G.T(-10, 0, 0), G.Rz(-Math.PI / 2), G.S(1.8, 14, 1.8)), this.c(s.grip), 0);
+    G.draw('box', G.chain(M, G.T(4, 0, 0), G.S(3, 3, 16)), this.c(s.steel), 0.1, this.metal);
+    G.draw('box', G.chain(M, G.T(32, 0, 0), G.S(52, 1.6, 9)), this.c(s.steel), 0.05, this.metal);
+    G.draw('box', G.chain(M, G.T(32, 0, 4.8), G.S(50, 1.2, 1.4)), this.c(s.edge), 0.5 + g * 0.5);
+    G.draw('wedge', G.chain(M, G.T(60, 0, 0), G.Rz(-Math.PI / 2), G.S(4.5, 8, 1.6)), this.c(s.steel), 0.05, this.metal);
+  },
+  // 인바디 : 대형 낫
+  invidi(G, M, opt = {}) {
+    const s = this.style.invidi, g = opt.glow || 0;
+    G.draw('tube', G.chain(M, G.T(-14, 0, 0), G.Rz(-Math.PI / 2), G.S(1.4, 62, 1.4)), this.c(s.shaft), 0, { spec: 0.4 });
+    const Mb = G.chain(M, G.T(46, 0, 0), G.Ry(Math.PI / 2));
+    G.draw('wedge', G.chain(Mb, G.T(0, 0, 14), G.Rx(Math.PI / 2), G.Rz(0.3), G.S(2, 30, 8)), this.c(s.blade), 0.1, this.metal);
+    G.draw('box', G.chain(Mb, G.T(0, -3, 14), G.Rz(0.3), G.S(0.8, 1, 28)), this.c(s.edge), 0.5 + g * 0.5);
+  },
+  // 아사디 : 가시 채찍 (휘어지는 마디 + 가시)
+  asadi(G, M, opt = {}) {
+    const s = this.style.asadi, t = opt.t || 0, g = opt.glow || 0;
+    G.draw('tube', G.chain(M, G.T(-6, 0, 0), G.Rz(-Math.PI / 2), G.S(1.4, 9, 1.4)), this.c(s.grip), 0);
+    let m = G.chain(M, G.T(3, 0, 0));
+    for (let i = 0; i < 10; i++) {
+      G.draw('tube', G.chain(m, G.Rz(-Math.PI / 2), G.S(0.9, 4, 0.9)), this.c(s.whip), 0.1);
+      if (i % 2) G.draw('cone2', G.chain(m, G.T(2, 1, 0), G.S(0.6, 2.4, 0.6)), this.c(s.thorn), 0.4 + g * 0.5);
+      m = G.chain(m, G.T(4, 0, 0), G.Rz(-0.15 + Math.sin(t * 4 + i * 0.6) * 0.12), G.Ry(Math.sin(t * 3 + i) * 0.1));
+    }
+  },
+  // 루시엘 : 시계 추 메이스
+  luciel(G, M, opt = {}) {
+    const s = this.style.luciel, t = opt.t || 0, g = opt.glow || 0;
+    G.draw('tube', G.chain(M, G.T(-8, 0, 0), G.Rz(-Math.PI / 2), G.S(1.4, 30, 1.4)), this.c(s.shaft), 0.05, this.metal);
+    const Mh = G.chain(M, G.T(28, 0, 0), G.Rx(Math.sin(t * 2) * 0.4));
+    G.draw('ball', G.chain(Mh, G.S(3, 3, 3)), this.c(s.rim), 0.2, this.metal);
+    const Mp = G.chain(Mh, G.Rz(-1.3 + Math.sin(t * 2.2) * 0.4), G.T(12, 0, 0));
+    G.draw('tube', G.chain(Mh, G.Rz(-1.3 + Math.sin(t * 2.2) * 0.4), G.Rz(-Math.PI / 2), G.S(0.6, 12, 0.6)), this.c(s.rim), 0.2, this.metal);
+    G.draw('tube', G.chain(Mp, G.Rz(Math.PI / 2), G.S(7, 1.6, 7)), this.c(s.face), 0.3 + g * 0.5, this.metal);   // 시계판
+    G.draw('thinRing', G.chain(Mp, G.Rz(Math.PI / 2), G.S(7.6, 7.6, 7.6)), this.c(s.rim), 0.3, this.metal);
+    G.draw('box', G.chain(Mp, G.T(0, 0.9, 0), G.Ry(t * 2), G.S(0.4, 0.3, 5)), this.c(s.hand), 0);
+  },
+  // 굴라 : 너클 클로 (양손)
+  gula(G, M, opt = {}) {
+    const s = this.style.gula, g = opt.glow || 0;
+    G.draw('box', G.chain(M, G.T(1, 0, 0), G.S(5, 5, 6)), this.c(s.knuckle), 0.05, this.metal);
+    for (let i = -1; i <= 1; i++) G.draw('cone2', G.chain(M, G.T(4, 0, i * 2.2), G.Rz(-Math.PI / 2 - 0.2), G.S(0.9, 11, 0.9)), this.c(s.claw), 0.1 + g * 0.3, this.metal);
   },
 
   // ---------- 아카이브 집행 수호자 : 방패 / 철퇴 ----------

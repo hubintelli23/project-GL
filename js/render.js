@@ -43,7 +43,7 @@ GL.Render = {
   draw() {
     const G = GL.G3, W = GL.World, t = W.time, A = GL.Assets;
     const obs = W.observe.on ? 1 : 0;
-    G.frame.mono = Math.max(W.mono || 0, GL.Ian.monoLevel());   // 전멸기 · 인과 역류 흑백
+    G.frame.mono = Math.max(W.mono || 0, GL.Ian.monoLevel(), W.buffs && W.buffs.worldStop > 0 ? 0.75 : 0);   // 전멸기 · 인과 역류 흑백
     G.begin(this.camera());
     G.resetProgram();
 

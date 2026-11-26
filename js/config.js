@@ -4,7 +4,7 @@
 // ============================================================
 window.GL = window.GL || {};
 
-GL.VERSION = 'v0.7';
+GL.VERSION = 'v0.8';
 
 GL.CONFIG = {
   // ---- 공통 규칙 ----
@@ -182,9 +182,137 @@ GL.CONFIG = {
       r: { name: '희망의 만화경', coef: 80, frac: 4, beams: 14, radius: 360 },
       assist: { name: '소망의 잔영', dur: 8, echo: 0.4 },
     },
+    // ===== 7대죄 (원래 플레이 불가 적대 세력) — 마스터 모드에서만 플레이 가능 · 수치는 전부 임시값 =====
+    baektor: {
+      sin: true, name: '백토르', role: '처형 · 격리', virtue: '오만', color: '#e8e8ff', weapon: '레이피어',
+      hp: 1000, atk: 110, def: 50, ultMax: 120,
+      light: [
+        { name: '광속 천공', coef: 50, frac: 2, thrust: true, len: 170, w: 34, lunge: 50 },
+        { name: 'Z 컷', coef: 22, frac: 1, zcut: true, range: 110, hits: 3 },
+        { name: '핵심 찌르기', coef: 70, frac: 4, thrust: true, len: 150, w: 26, stun: 1.0 },
+        { name: '질서의 참격', coef: 95, frac: 8, grid: true, len: 190, w: 150 },
+      ],
+      heavy: { name: '환영 난사', coef: 26, frac: 2, hits: 8, len: 200, w: 70 },
+      jump: { coef: 90, frac: 4, radius: 80, stun: 0.8 },
+      jumpHeavy: { coef: 140, frac: 8, radius: 100, stun: 1.2 },
+      passive: { name: '오만한 연산', full: 6, speedMax: 0.35, lockCut: 0.35 },
+      q: { name: '성관 단죄', cd: 8, coef: 180, frac: 14, dash: 200, stun: 2.0 },
+      e: { name: '격리 큐브', cd: 12, coef: 60, frac: 6, range: 320, dur: 4, dmgTaken: 0.3 },
+      r: { name: '시스템 단죄 : 천공의 검', coef: 650, frac: 30, radius: 260, delay: 0.9 },
+      assist: { name: '절단 연산', dur: 8, extra: 0.25 },
+    },
+    ploto: {
+      sin: true, name: '플로토', role: '흡혈 · 갈취', virtue: '탐욕', color: '#d2304a', weapon: '사슬 톱날 채찍',
+      hp: 1150, atk: 95, def: 55, ultMax: 115,
+      light: [
+        { name: '톱날 절삭', coef: 40, frac: 2, range: 150, arc: 40, bleed: 2 },
+        { name: '탐식 휘두르기', coef: 45, frac: 2, radius: 140, bleed: 2 },
+        { name: '출혈 채찍', coef: 65, frac: 3, range: 170, arc: 30, bleed: 4 },
+        { name: '갈고리 포박', coef: 90, frac: 8, len: 220, w: 40, hook: true, drain: 0.04 },
+      ],
+      heavy: { name: '포식', coef: 110, frac: 10, radius: 200, pull: 120, slow: 3 },
+      jump: { coef: 80, frac: 3, radius: 110, pull: 50 },
+      jumpHeavy: { coef: 120, frac: 7, radius: 140, pull: 80 },
+      passive: { name: '탐욕의 갈취', steal: 0.03, atkPer: 0.01, max: 20, keep: 4 },
+      q: { name: '생명력 강탈', cd: 10, coef: 200, frac: 10, range: 260, heal: 0.18 },
+      e: { name: '검붉은 톱날파', cd: 8, coef: 140, frac: 10, len: 420 },
+      r: { name: '탐욕의 구체 : 데이터 압쇄', coef: 70, frac: 4, radius: 220, hits: 8, pull: 70 },
+      assist: { name: '라이프 스틸', dur: 8, steal: 0.06 },
+    },
+    ares: {
+      sin: true, name: '아레스', role: '광전사 · 파쇄', virtue: '분노', color: '#ff4a2a', weapon: '양손 대검',
+      hp: 1350, atk: 120, def: 60, ultMax: 130,
+      light: [
+        { name: '혈흔 내려치기', coef: 70, frac: 4, range: 110, arc: 50, stun: 0.5 },
+        { name: '광란', coef: 60, frac: 3, range: 120, arc: 120 },
+        { name: '노이즈 올리기', coef: 75, frac: 4, range: 130, arc: 90, launch: true },
+        { name: '단두대', coef: 140, frac: 12, len: 320, w: 60, wave: true },
+      ],
+      heavy: { name: '혈흔 파동', coef: 170, frac: 14, radius: 140, len: 360, w: 80 },
+      jump: { coef: 110, frac: 6, radius: 140, stun: 0.8 },
+      jumpHeavy: { coef: 180, frac: 12, radius: 180, stun: 1.2 },
+      passive: { name: '핏빛 분노', dmgMax: 1.0, reduceMax: 0.4 },
+      q: { name: '폭주 강화', cd: 14, dur: 8, reduce: 0.3, range: 1.4 },
+      e: { name: '자폭파', cd: 12, coef: 320, frac: 20, radius: 200, hpCost: 0.12 },
+      r: { name: '비극의 단두대 : 양분', coef: 700, frac: 35, len: 700, w: 110 },
+      assist: { name: '광란의 버서커', dur: 8, atkUp: 0.35, defDown: 0.2 },
+    },
+    invidi: {
+      sin: true, name: '인바디', role: '교란 · 암살', virtue: '질투', color: '#5ad18c', weapon: '대형 낫',
+      hp: 950, atk: 108, def: 45, ultMax: 120,
+      light: [
+        { name: '위상 회전', coef: 45, frac: 2, range: 130, arc: 180 },
+        { name: '질투', coef: 40, frac: 2, range: 90, arc: 60, knock: 60 },
+        { name: '자루 습격', coef: 55, frac: 3, range: 110, arc: 80, defDown: 0.15 },
+        { name: '목긋기', coef: 110, frac: 9, range: 120, arc: 120, stun: 1.2 },
+      ],
+      heavy: { name: '기습치기', coef: 160, frac: 12, range: 300, radius: 90 },
+      jump: { coef: 80, frac: 3, radius: 130 },
+      jumpHeavy: { coef: 130, frac: 8, radius: 160 },
+      passive: { name: '정체성', per: 0.015, max: 20, keep: 5 },
+      q: { name: '위상반전', cd: 9, coef: 120, frac: 10, range: 360, stun: 1.2 },
+      e: { name: '그림자 봉인', cd: 11, coef: 90, frac: 8, radius: 170, seal: 4, slow: 4 },
+      r: { name: '질투의 미러링 : 분신 무도회', coef: 55, frac: 3, radius: 260, clones: 6, hits: 12 },
+      assist: { name: '교란 결계', dur: 8, miss: 0.4 },
+    },
+    asadi: {
+      sin: true, name: '아사디', role: '환각 · 매혹', virtue: '색욕', color: '#c26bff', weapon: '가시 채찍 & 바늘',
+      hp: 920, atk: 100, def: 42, ultMax: 115,
+      light: [
+        { name: '자색 비늘', coef: 30, frac: 1, needles: 2, range: 300 },
+        { name: '가시 뿌리기', coef: 45, frac: 2, range: 150, arc: 110 },
+        { name: '가시 자극', coef: 65, frac: 4, len: 200, w: 36 },
+        { name: '매혹베기', coef: 80, frac: 7, range: 160, arc: 140, gas: true, knock: 50 },
+      ],
+      heavy: { name: '자색 향수 유포', radius: 220, charm: 2.5, coef: 60, frac: 4 },
+      jump: { coef: 60, frac: 3, radius: 100, needles: 7 },
+      jumpHeavy: { coef: 100, frac: 6, radius: 130, needles: 11 },
+      passive: { name: '이성 마비', defDown: 0.2, dur: 4 },
+      q: { name: '가시 덩굴', cd: 10, coef: 110, frac: 10, radius: 140, root: 2.5 },
+      e: { name: '환각 연기', cd: 12, radius: 170, dur: 6, coef: 20 },
+      r: { name: '비극의 가시발 : 연쇄 매혹', coef: 90, frac: 5, radius: 280, blasts: 8 },
+      assist: { name: '정서 오염', dur: 8, radius: 260 },
+    },
+    luciel: {
+      sin: true, name: '루시엘', role: '감속 · 시간 지연', virtue: '나태', color: '#a0a8b8', weapon: '시계 추 메이스',
+      hp: 1100, atk: 100, def: 58, ultMax: 130,
+      light: [
+        { name: '나태의 추', coef: 55, frac: 3, range: 130, arc: 70 },
+        { name: '시계 자루', coef: 45, frac: 2, range: 90, arc: 60, knock: 70, stun: 0.6 },
+        { name: '정체 영역', coef: 60, frac: 4, radius: 100, field: 4 },
+        { name: '침체 파동', coef: 100, frac: 9, radius: 170, slow: 5 },
+      ],
+      heavy: { name: '그레비티', coef: 90, frac: 10, radius: 160, dist: 130, dur: 5 },
+      jump: { coef: 80, frac: 4, radius: 110, field: 4 },
+      jumpHeavy: { coef: 120, frac: 8, radius: 140, field: 6 },
+      passive: { name: '나태의 숲', radius: 150, slow: 0.3 },
+      q: { name: '정지 구체', cd: 7, coef: 90, frac: 8, count: 3, slow: 4 },
+      e: { name: '지연', cd: 13, radius: 260, seal: 5, freezeShots: 5 },
+      r: { name: '세계 정지 : 나태자의 방관', coef: 900, frac: 40, stop: 3, radius: 900 },
+      assist: { name: '시간 도둑', cut: 4 },
+    },
+    gula: {
+      sin: true, name: '굴라', role: '포식 · 탱커', virtue: '폭식', color: '#d8a040', weapon: '클로 & 생체 입',
+      hp: 1500, atk: 95, def: 75, ultMax: 130,
+      light: [
+        { name: '긁기', coef: 50, frac: 3, range: 90, arc: 70 },
+        { name: '체중 박치기', coef: 60, frac: 4, len: 110, w: 60, lunge: 60, knock: 50, stun: 0.5 },
+        { name: '기형의 입', coef: 75, frac: 5, range: 110, arc: 50, bite: true },
+        { name: '침 뱉기', coef: 100, frac: 8, spit: true, knock: 80 },
+      ],
+      heavy: { name: '집어 삼키기', coef: 140, frac: 12, range: 160, arc: 90 },
+      jump: { coef: 100, frac: 6, radius: 140, stun: 0.8 },
+      jumpHeavy: { coef: 160, frac: 12, radius: 180, stun: 1.2 },
+      passive: { name: '과식', hpPer: 0.03, defPer: 3, max: 10 },
+      q: { name: '블랙홀', cd: 10, coef: 70, frac: 6, radius: 280, pull: 180 },
+      e: { name: '침 분사', cd: 8, coef: 130, frac: 10, range: 220, arc: 70 },
+      r: { name: '대식의 아가리 : 압쇄 포식', coef: 720, frac: 36, range: 300, arc: 120, pull: 140 },
+      assist: { name: '식탄', count: 3, heal: 0.15 },
+    },
   },
   // 파티 편성 : 이안(주인공·리더, 관측 담당)은 고정, 나머지 6명 중 2명 선택
   roster: ['ian', 'taron', 'serena', 'baren', 'kay', 'clea', 'noah'],
+  sinRoster: ['baektor', 'ploto', 'ares', 'invidi', 'asadi', 'luciel', 'gula'],   // 7대죄 : 마스터 모드 전용
   partyOrder: ['ian', 'baren', 'kay'],
 
   // ---- 적 ----
